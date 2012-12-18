@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.IO;
 using System.Web;
@@ -11,21 +10,57 @@ namespace ComskipToCuttermaran
     {
         static int Main(string[] args)
         {
-            if (args.Length < 3)
+            if (args.Length < 1)
             {
-                Console.WriteLine("Usage: " + Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + " <comskip.txt> <video.m2v> <audio.ac3> [frameOffset]");
+                PrintUsage();
                 return -1;
             }
 
+            string inputName = Path.GetFullPath(args[0]);
+            string videoFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".m2v";
+            string audioFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".mp2";
+            if (!File.Exists(audioFilename))
+            {
+                audioFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".ac3";
+            }
+
             int frameOffset = 0;
-            if (args.Length > 3)
+            if (args.Length >= 4)
             {
                 frameOffset = int.Parse(args[3]);
             }
+            if (args.Length >= 3)
+            {
+                videoFilename = Path.GetFullPath(args[1]);
+                audioFilename = Path.GetFullPath(args[2]);
+            }
 
-            string inputName = Path.GetFullPath(args[0]);
-            string videoFilename = Path.GetFullPath(args[1]);
-            string audioFilename = Path.GetFullPath(args[2]);
+            string extension = Path.GetExtension(inputName);
+
+            if (extension.Equals(".txt", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return ProcessTxtFile(inputName, videoFilename, audioFilename, frameOffset);
+            }
+            else if (extension.Equals(".csv", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return ProcessCsvFile(inputName, videoFilename, audioFilename, frameOffset);
+            }
+            else
+            {
+                Console.WriteLine("Unexpected file extension '" + extension + "'. Please supply either a .txt or .csv file.");
+                return -2;
+            }
+        }
+
+        private static void PrintUsage()
+        {
+            Console.WriteLine("Usage: " + Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + " <comskip.txt> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+            Console.WriteLine(" or");
+            Console.WriteLine("Usage: " + Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + " <comskip.csv> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+        }
+
+        private static int ProcessTxtFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
+        {
             string filename = Path.GetFileNameWithoutExtension(inputName);
             string outputName = Path.GetDirectoryName(inputName) + "\\" + filename + ".cpf";
             using (var input = new StreamReader(inputName))
@@ -54,13 +89,8 @@ namespace ComskipToCuttermaran
                     return -4;
                 }
 
-                using (var output = new StreamWriter(outputName))
+                using (var output = new CuttermaranFileWriter(outputName, videoFilename, audioFilename, totalFrames))
                 {
-                    output.WriteLine(@"<?xml version=""1.0"" standalone=""yes""?>");
-                    output.WriteLine(@"<StateData xmlns=""http://cuttermaran.kickme.to/StateData.xsd"">");
-                    output.WriteLine("\t" + @"<usedVideoFiles FileID=""0"" FileName=""" + HttpUtility.HtmlEncode(videoFilename) + @""" />");
-                    output.WriteLine("\t" + @"<usedAudioFiles FileID=""1"" FileName=""" + HttpUtility.HtmlEncode(audioFilename) + @""" StartDelay=""0"" />");
-
                     int lastAdEnd = -1;
                     while ((line = input.ReadLine()) != null)
                     {
@@ -84,7 +114,7 @@ namespace ComskipToCuttermaran
                         int showStart = lastAdEnd + 1;
                         int showEnd = adStart - 1;
 
-                        WriteCut(output, showStart, showEnd, totalFrames);
+                        output.WriteCut(showStart, showEnd);
 
                         if (!int.TryParse(parts[1], out lastAdEnd))
                         {
@@ -101,35 +131,28 @@ namespace ComskipToCuttermaran
                         return -10;
                     }
 
-                    WriteCut(output, lastAdEnd + 1, totalFrames, totalFrames);
-
-                    output.WriteLine("\t" + @"<CmdArgs OutFile=""" + HttpUtility.HtmlEncode(filename) + @"_clean.m2v"" snapToCutPoints=""false"" />");
-                    output.WriteLine(@"</StateData>");
-
+                    output.WriteCut(lastAdEnd + 1, totalFrames);
                 }
             }
             return 0;
         }
 
-        private static void WriteCut(StreamWriter output, int showStart, int showEnd, int totalFrames)
+        private static int ProcessCsvFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
         {
-            if (showStart < 0)
-                showStart = 0;
-            if (showEnd < 0)
-                showEnd = 0;
-            if (showStart > totalFrames)
-                showStart = totalFrames;
-            if (showEnd > totalFrames)
-                showEnd = totalFrames;
-
-            if (showEnd > showStart)
+            string logFile = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + "_scoring.log";
+            using (var output = new StreamWriter(logFile, false))
             {
-                output.WriteLine("\t" + @"<CutElements refVideoFile=""0"" StartPosition=""" + showStart.ToString() + @""" EndPosition=""" + showEnd.ToString() + @""">");
-                output.WriteLine("\t\t" + @"<CurrentFiles refVideoFiles=""0"" />");
-                output.WriteLine("\t\t" + @"<cutAudioFiles refAudioFile=""1"" />");
-                output.WriteLine("\t" + @"</CutElements>");
             }
 
+            var processor = new ComskipCsvProcessor(inputName, videoFilename, audioFilename, frameOffset);
+            processor.Log += (message) => {
+                Console.WriteLine(message);
+                using (var output = new StreamWriter(logFile, true))
+                {
+                    output.WriteLine(message);
+                }
+            };
+            return processor.Process();
         }
 
     }
