@@ -3,36 +3,87 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System.Web;
+using System.Windows.Forms;
 
 namespace ComskipToCuttermaran
 {
     class Program
     {
+        static bool _consoleCreated = false;
+
+        [STAThreadAttribute()]
         static int Main(string[] args)
         {
-            if (args.Length < 1)
+            int result = MainProc(args);
+            if (_consoleCreated)
+            {
+                Console.Write("Press any key to exit");
+                Console.ReadKey();
+            }
+            return result;
+        }
+
+        static int MainProc(string[] args)
+        {
+            bool showWindow = false;
+            string inputName = null;
+            string videoFilename = null;
+            string audioFilename = null;
+            int frameOffset = 0;
+
+            int state = 0;
+            foreach (var arg in args)
+            {
+                if (arg == "-w")
+                {
+                    showWindow = true;
+                    continue;
+                }
+
+                if (state == 0)
+                {
+                    inputName = Path.GetFullPath(arg);
+                    state++;
+                }
+                else if (state == 1)
+                {
+                    videoFilename = Path.GetFullPath(arg);
+                    state++;
+                }
+                else if (state == 2)
+                {
+                    audioFilename = Path.GetFullPath(arg);
+                    state++;
+                }
+                else if (state == 3)
+                {
+                    frameOffset = int.Parse(arg);
+                    state++;
+                }
+            }
+
+            if (!showWindow)
+            {
+                _consoleCreated = ActivateConsoleMode();
+            }
+
+            if (inputName == null)
             {
                 PrintUsage();
                 return -1;
             }
 
-            string inputName = Path.GetFullPath(args[0]);
-            string videoFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".m2v";
-            string audioFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".mp2";
-            if (!File.Exists(audioFilename))
+            if (videoFilename == null)
             {
-                audioFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".ac3";
+                videoFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".m2v";
             }
-
-            int frameOffset = 0;
-            if (args.Length >= 4)
+            if (audioFilename == null)
             {
-                frameOffset = int.Parse(args[3]);
-            }
-            if (args.Length >= 3)
-            {
-                videoFilename = Path.GetFullPath(args[1]);
-                audioFilename = Path.GetFullPath(args[2]);
+                audioFilename = Path.GetDirectoryName(videoFilename) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".mp2";
+                if (!File.Exists(audioFilename))
+                {
+                    audioFilename = Path.GetDirectoryName(videoFilename) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".ac3";
+                }
             }
 
             string extension = Path.GetExtension(inputName);
@@ -43,7 +94,10 @@ namespace ComskipToCuttermaran
             }
             else if (extension.Equals(".csv", StringComparison.CurrentCultureIgnoreCase))
             {
-                return ProcessCsvFile(inputName, videoFilename, audioFilename, frameOffset);
+                if (showWindow)
+                    return ShowWindow(inputName, videoFilename, audioFilename, frameOffset);
+                else
+                    return ProcessCsvFile(inputName, videoFilename, audioFilename, frameOffset);
             }
             else
             {
@@ -52,11 +106,33 @@ namespace ComskipToCuttermaran
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern bool AllocConsole();
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern bool AttachConsole(int pid);
+
+        static bool ActivateConsoleMode()
+        {
+            if (!AttachConsole(-1))
+            {
+                AllocConsole();
+                return true;
+            }
+            return false;
+        }
+
+
         private static void PrintUsage()
         {
-            Console.WriteLine("Usage: " + Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + " <comskip.txt> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+            var exeName = Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+            Console.WriteLine("Usage: " + exeName + " <comskip.txt> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+            Console.WriteLine(" This loads a comskip .txt file and converts it to a cuttermaran cut file.");
+            Console.WriteLine();
             Console.WriteLine(" or");
-            Console.WriteLine("Usage: " + Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + " <comskip.csv> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+            Console.WriteLine("Usage: " + exeName + " [-w] <comskip.csv> [video.m2v] [audio.mp2/audio.ac3] [frameOffset]");
+            Console.WriteLine(" This loads a comskip .csv file, tries to detect commercials,");
+            Console.WriteLine(" and then writes a cuttermaran cut file.");
+            Console.WriteLine(" -w : Show window to help with tuning.");
         }
 
         private static int ProcessTxtFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
@@ -152,7 +228,23 @@ namespace ComskipToCuttermaran
                     output.WriteLine(message);
                 }
             };
-            return processor.Process();
+
+            int ret;
+            ret = processor.Process();
+            if (ret < 0)
+                return ret;
+
+            ret = processor.WriteCuttermaranFile();
+            return ret;
+        }
+
+        private static int ShowWindow(string inputName, string videoFilename, string audioFilename, int frameOffset)
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            var form = new MainForm(inputName, videoFilename, audioFilename, frameOffset);
+            Application.Run(form);
+            return 0;
         }
 
     }

@@ -1,0 +1,16 @@
+﻿
+- Save and execute cuttermaran file.
+
+- Add titles to each stats graph.
+- Add display of current frame statistics.
+
+- Add Scoring tab.
+
+- Deinterlace fields
+
+- Process images
+- Process sound
+
+- Add support for .ts
+
+- Find a better name

@@ -6,12 +6,15 @@ using System.Linq;
 
 namespace ComskipToCuttermaran
 {
-    class ComskipCsvProcessor
+    public class ComskipCsvProcessor
     {
         private string _inputName;
         private string _videoFilename;
         private string _audioFilename;
         private int _frameOffset;
+
+        private string _cuttermaranFilename;
+
         private int _frameRate;
         private Dictionary<ColumnId, int> _columnIds = new Dictionary<ColumnId, int>();
 
@@ -51,6 +54,12 @@ namespace ComskipToCuttermaran
             public double ScoreBelowAverageLogSoundThreshold = -0.2;
             public double ScoreBelowAverageLogSoundMultiplier = -0.5;
         }
+
+        public string CuttermaranFilename
+        {
+            get { return _cuttermaranFilename; }
+            set { _cuttermaranFilename = value; }
+        }
         #endregion
 
         #region "Data"
@@ -62,9 +71,15 @@ namespace ComskipToCuttermaran
             public List<Block> Blocks = new List<Block>();
             public Block WholeFileAverages = new Block();
 
-            public int? BrightnessThreshold;
-            public int? UniformThreshold;
-            public int? SoundThreshold;
+            public HashSet<int> ManualCutFrames = new HashSet<int>();
+
+            public int BrightnessThreshold;
+            public int UniformThreshold;
+            public int SoundThreshold;
+
+            public int BrightnessThresholdPreSafety;
+            public int UniformThresholdPreSafety;
+            public int SoundThresholdPreSafety;
 
             public HistogramData BrightnessThresholdHistogram;
             public HistogramData UniformThresholdHistogram;
@@ -132,10 +147,13 @@ namespace ComskipToCuttermaran
         {
             public List<Frame> Frames = new List<Frame>();
             public Frame CutFrame;
+            public bool IsManualCutPoint;
         }
 
         public class Block
         {
+            public int BlockNumber;
+
             public Frame StartFrame;
             public Frame EndFrame;
 
@@ -151,10 +169,15 @@ namespace ComskipToCuttermaran
             public bool StrictLength;
             public bool IsCommercial;
 
+            public bool? IsCommercialOverride;
+            public bool IsManualCutPoint;
+
             public double ScoreBrightness;
             public double ScoreLogo;
             public double ScoreUniform;
             public double ScoreLogSound;
+
+            public int StartFrameNumber { get { return StartFrame.FrameNumber; } }
 
             public override string ToString()
             {
@@ -201,6 +224,8 @@ namespace ComskipToCuttermaran
             _videoFilename = videoFilename;
             _audioFilename = audioFilename;
             _frameOffset = frameOffset;
+
+            _cuttermaranFilename = Path.GetDirectoryName(_inputName) + "\\" + Path.GetFileNameWithoutExtension(_inputName) + ".cpf";
         }
 
         public int Process()
@@ -213,55 +238,68 @@ namespace ComskipToCuttermaran
                 return result;
 
             // Detect thresholds
-            if (Data.BrightnessThreshold == null)
-            {
-                if (Settings.BrightnessThreshold <= 0)
-                {
-                    Data.BrightnessThreshold = DetectThreshold(ColumnId.Brightness, out Data.BrightnessThresholdHistogram);
-                    Data.BrightnessThreshold = (int)(Data.BrightnessThreshold * (1.0 + Settings.DetectBrightnessSafetyBufferPercent));
-                    Data.BrightnessThreshold += Settings.DetectBrightnessSafetyBufferOffset;
-                    Log("Adding safety buffer to threshold: " + Data.BrightnessThreshold.ToString());
-                }
-                else
-                {
-                    Data.BrightnessThreshold = Settings.BrightnessThreshold;
-                    Log("Brightness threshold loaded: " + Data.BrightnessThreshold.ToString());
-                }
-            }
-
-            if (Data.UniformThreshold == null)
-            {
-                if (Settings.UniformThreshold <= 0)
-                {
-                    Data.UniformThreshold = DetectThreshold(ColumnId.Uniform, out Data.UniformThresholdHistogram);
-                    Data.UniformThreshold = (int)(Data.UniformThreshold * (1.0 + Settings.DetectUniformSafetyBufferPercent));
-                    Data.UniformThreshold += Settings.DetectUniformSafetyBufferOffset;
-                    Log("Adding safety buffer to threshold: " + Data.UniformThreshold.ToString());
-                }
-                else
-                {
-                    Data.UniformThreshold += Settings.UniformThreshold;
-                    Log("Uniform threshold loaded: " + Data.UniformThreshold.ToString());
-                }
-            }
-
-            if (Data.SoundThreshold == null)
-            {
-                if (Settings.SoundThreshold <= 0)
-                {
-                    Data.SoundThreshold = DetectThreshold(ColumnId.Sound, out Data.SoundThresholdHistogram);
-                    Data.SoundThreshold = (int)(Data.SoundThreshold * (1.0 + Settings.DetectSoundSafetyBufferPercent));
-                    Data.SoundThreshold += Settings.DetectSoundSafetyBufferOffset;
-                    Log("Adding safety buffer to threshold: " + Data.SoundThreshold.ToString());
-                }
-                else
-                {
-                    Data.SoundThreshold += Settings.SoundThreshold;
-                    Log("Sound threshold loaded: " + Data.SoundThreshold.ToString());
-                }
-            }
+            DetectThresholds();
 
             result = FindBlackFrames();
+
+            return result;
+        }
+
+        public int Reprocess(bool keepManualCommercialOverrides)
+        {
+            int result = 0;
+            Log("Reprocessing.");
+
+            var oldData = Data;
+            var newData = new Data_info();
+            newData.Frames = oldData.Frames;
+            newData.ManualCutFrames = oldData.ManualCutFrames;
+            Data = newData;
+
+            DetectThresholds();
+
+            result = FindBlackFrames();
+
+            if (keepManualCommercialOverrides)
+            {
+                // Copy manual commercial overrides from old blocks to new blocks.
+                if ((oldData.Blocks.Count > 0) && (newData.Blocks.Count > 0))
+                {
+                    int oldIndex = 0;
+                    int newIndex = 0;
+                    Block oldBlock = null;
+                    Block newBlock = null;
+                    while ((oldIndex < oldData.Blocks.Count) && (newIndex < newData.Blocks.Count))
+                    {
+                        var oldBlockNext = oldData.Blocks[oldIndex];
+                        var newBlockNext = newData.Blocks[newIndex];
+
+                        if (oldBlockNext.StartFrameNumber < newBlockNext.StartFrameNumber)
+                        {
+                            oldIndex++;
+                        }
+                        else if (oldBlockNext.StartFrameNumber > newBlockNext.StartFrameNumber)
+                        {
+                            newIndex++;
+                        }
+                        else
+                        {
+                            if ((oldBlock != null) && (newBlock != null))
+                            {
+                                newBlock.IsCommercialOverride = oldBlock.IsCommercialOverride;
+                            }
+
+                            oldBlock = oldBlockNext;
+                            newBlock = newBlockNext;
+                            oldIndex++;
+                            newIndex++;
+                            continue;
+                        }
+                        oldBlock = null;
+                        newBlock = null;
+                    }
+                }
+            }
 
             return result;
         }
@@ -315,6 +353,52 @@ namespace ComskipToCuttermaran
             return 0;
         }
 
+        private void DetectThresholds()
+        {
+            if (Settings.BrightnessThreshold <= 0)
+            {
+                Data.BrightnessThreshold = DetectThreshold(ColumnId.Brightness, out Data.BrightnessThresholdHistogram);
+                Data.BrightnessThresholdPreSafety = Data.BrightnessThreshold;
+                Data.BrightnessThreshold = (int)(Data.BrightnessThreshold * (1.0 + Settings.DetectBrightnessSafetyBufferPercent));
+                Data.BrightnessThreshold += Settings.DetectBrightnessSafetyBufferOffset;
+                Log("Adding safety buffer to threshold: " + Data.BrightnessThreshold.ToString());
+            }
+            else
+            {
+                Data.BrightnessThreshold = Settings.BrightnessThreshold;
+                Log("Brightness threshold loaded: " + Data.BrightnessThreshold.ToString());
+            }
+
+            if (Settings.UniformThreshold <= 0)
+            {
+                Data.UniformThreshold = DetectThreshold(ColumnId.Uniform, out Data.UniformThresholdHistogram);
+                Data.UniformThresholdPreSafety = Data.UniformThreshold;
+                Data.UniformThreshold = (int)(Data.UniformThreshold * (1.0 + Settings.DetectUniformSafetyBufferPercent));
+                Data.UniformThreshold += Settings.DetectUniformSafetyBufferOffset;
+                Log("Adding safety buffer to threshold: " + Data.UniformThreshold.ToString());
+            }
+            else
+            {
+                Data.UniformThreshold += Settings.UniformThreshold;
+                Log("Uniform threshold loaded: " + Data.UniformThreshold.ToString());
+            }
+
+            if (Settings.SoundThreshold <= 0)
+            {
+                Data.SoundThreshold = DetectThreshold(ColumnId.Sound, out Data.SoundThresholdHistogram);
+                Data.SoundThresholdPreSafety = Data.SoundThreshold;
+                Data.SoundThreshold = (int)(Data.SoundThreshold * (1.0 + Settings.DetectSoundSafetyBufferPercent));
+                Data.SoundThreshold += Settings.DetectSoundSafetyBufferOffset;
+                Log("Adding safety buffer to threshold: " + Data.SoundThreshold.ToString());
+            }
+            else
+            {
+                Data.SoundThreshold += Settings.SoundThreshold;
+                Log("Sound threshold loaded: " + Data.SoundThreshold.ToString());
+            }
+
+        }
+
         private int FindBlackFrames()
         {
             {
@@ -322,6 +406,20 @@ namespace ComskipToCuttermaran
 
                 foreach (var frame in Data.Frames)
                 {
+                    if (Data.ManualCutFrames.Contains(frame.FrameNumber))
+                    {
+                        if (blackFrameGroup.Frames.Count > 0)
+                        {
+                            Data.BlackFrameGroups.Add(blackFrameGroup);
+                            blackFrameGroup = new BlackFrameGroup();
+                        }
+                        blackFrameGroup.Frames.Add(frame);
+                        blackFrameGroup.IsManualCutPoint = true;
+                        Data.BlackFrameGroups.Add(blackFrameGroup);
+                        blackFrameGroup = new BlackFrameGroup();
+                        continue;
+                    }
+
                     if (frame.Invalid)
                         continue;
 
@@ -431,15 +529,18 @@ namespace ComskipToCuttermaran
 
             // Create blocks
             Frame startFrame = Data.Frames[0];
+            bool startFrameIsManualCutPoint = false;
             for (int blackFrameGroupIndex = 0; blackFrameGroupIndex <= Data.BlackFrameGroups.Count; blackFrameGroupIndex++)
             {
                 Frame nextFrame = null;
                 int endFrameNumber;
+                bool isManualCutPoint = false;
                 if (blackFrameGroupIndex < Data.BlackFrameGroups.Count)
                 {
                     var blackFrameGroup = Data.BlackFrameGroups[blackFrameGroupIndex];
                     nextFrame = blackFrameGroup.CutFrame;
                     endFrameNumber = nextFrame.FrameNumber - 1;
+                    isManualCutPoint = blackFrameGroup.IsManualCutPoint;
                 }
                 else
                 {
@@ -452,19 +553,22 @@ namespace ComskipToCuttermaran
                 Frame endFrame = Data.Frames[endFrameNumber];
 
                 var block = new Block();
+                block.BlockNumber = Data.Blocks.Count;
                 block.StartFrame = startFrame;
                 block.EndFrame = endFrame;
+                block.IsManualCutPoint = startFrameIsManualCutPoint;
                 Data.Blocks.Add(block);
 
                 startFrame = nextFrame;
+                startFrameIsManualCutPoint = isManualCutPoint;
             }
 
             // Calculate whole file averages
             Log("Whole file averages");
             Log("#    Start    End |  Bright      S/C   Logo    Uniform    Sound LogSound   Length");
             Data.WholeFileAverages = new Block();
-            Data.WholeFileAverages.StartFrame = Data.Frames.First();
-            Data.WholeFileAverages.EndFrame = Data.Frames.Last();
+            Data.WholeFileAverages.StartFrame = Data.Frames[0];
+            Data.WholeFileAverages.EndFrame = Data.Frames[Data.Frames.Count - 1];
             CalculateBlockAverages(Data.WholeFileAverages);
             PrintBlockAverages(Data.WholeFileAverages, "");
 
@@ -527,11 +631,15 @@ namespace ComskipToCuttermaran
 
             // TODO: Merge adjacent blocks
 
+            return 0;
+        }
+
+        public int WriteCuttermaranFile()
+        {
             Log("");
             Log("Writing cuttermaran file");
             {
-                var cuttermaranFilename = Path.GetDirectoryName(_inputName) + "\\" + Path.GetFileNameWithoutExtension(_inputName) + ".cpf";
-                using (var cuttermaranFile = new CuttermaranFileWriter(cuttermaranFilename, _videoFilename, _audioFilename, Data.Frames.Count))
+                using (var cuttermaranFile = new CuttermaranFileWriter(_cuttermaranFilename, _videoFilename, _audioFilename, Data.Frames.Count))
                 {
                     foreach (var block in Data.Blocks)
                     {
