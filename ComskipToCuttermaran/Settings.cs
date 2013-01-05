@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Drawing;
+using ComskipToCuttermaran.Statistics;
 
 namespace ComskipToCuttermaran
 {
@@ -103,7 +104,7 @@ namespace ComskipToCuttermaran
 
         public List<string> RecentFiles { get; set; }
 
-        public ComskipCsvProcessor.Settings_info DetectionSettings { get; set; }
+        public Settings_info DetectionSettings { get; set; }
 
         public SettingsData()
         {
@@ -112,7 +113,7 @@ namespace ComskipToCuttermaran
             DiffProgram = Utils.DiffPrograms.DiffProgram.AutoDetect;
             SavedWindows = new SavedWindowSettingsList();
             RecentFiles = new List<string>();
-            DetectionSettings = new ComskipCsvProcessor.Settings_info();
+            DetectionSettings = new Settings_info();
         }
 
     }

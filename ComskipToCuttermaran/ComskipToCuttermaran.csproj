@@ -56,7 +56,16 @@
     <Compile Include="BaseForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="ComskipCsvProcessor.cs" />
+    <Compile Include="GraphsUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="GraphsUserControl.Designer.cs">
+      <DependentUpon>GraphsUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="FileDetect.cs" />
+    <Compile Include="MediaFile.SwsScaler.cs" />
+    <Compile Include="Statistics\Settings_info.cs" />
+    <Compile Include="Statistics\StatisticsProcessor.cs" />
     <Compile Include="CuttermaranFileWriter.cs" />
     <Compile Include="ErrorForm.cs">
       <SubType>Form</SubType>
@@ -64,6 +73,7 @@
     <Compile Include="ErrorForm.Designer.cs">
       <DependentUpon>ErrorForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Statistics\IStatisticsProcessor.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -97,6 +107,9 @@
     <None Include="app.config" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="GraphsUserControl.resx">
+      <DependentUpon>GraphsUserControl.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="ErrorForm.resx">
       <DependentUpon>ErrorForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -114,6 +127,10 @@
     <ProjectReference Include="..\CSharpControls\CSharpControls.csproj">
       <Project>{D554123C-1B84-4FA7-AEB3-097B127406F4}</Project>
       <Name>CSharpControls</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ImageProcessor\ImageProcessing.csproj">
+      <Project>{CABDF999-8AB6-4E30-838D-29146B7C0183}</Project>
+      <Name>ImageProcessing</Name>
     </ProjectReference>
     <ProjectReference Include="..\Libs\ObjectListViewSVN\ObjectListView2010.csproj">
       <Project>{18FEDA0C-D147-4286-B39A-01204808106A}</Project>

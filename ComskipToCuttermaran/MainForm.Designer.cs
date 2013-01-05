@@ -43,23 +43,26 @@
             this.olvColumnAverageSound = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.olvColumnAverageLogo = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
             this.olvColumnStrictLength = ((BrightIdeasSoftware.OLVColumn)(new BrightIdeasSoftware.OLVColumn()));
-            this.labelPreviewFrame = new System.Windows.Forms.Label();
+            this.labelCurrentPosition = new System.Windows.Forms.Label();
             this.splitContainer3 = new System.Windows.Forms.SplitContainer();
             this.splitContainer4 = new System.Windows.Forms.SplitContainer();
             this.buttonSeekToEnd = new CSharpControls.VistaButton();
-            this.buttonSeekToNextKeyFrame = new CSharpControls.VistaButton();
-            this.buttonSeekToPreviousKeyFrame = new CSharpControls.VistaButton();
+            this.buttonSeekForwardSmall = new CSharpControls.VistaButton();
+            this.buttonSeekBackSmall = new CSharpControls.VistaButton();
             this.buttonSeekToNextFrame = new CSharpControls.VistaButton();
-            this.buttonSeekBack60s = new CSharpControls.VistaButton();
+            this.buttonSeekBackLarge = new CSharpControls.VistaButton();
             this.buttonSeekToPreviousFrame = new CSharpControls.VistaButton();
-            this.buttonSeekForward60s = new CSharpControls.VistaButton();
-            this.buttonSeekForward10s = new CSharpControls.VistaButton();
+            this.buttonSeekForwardLarge = new CSharpControls.VistaButton();
+            this.buttonSeekForwardMedium = new CSharpControls.VistaButton();
             this.buttonSave = new CSharpControls.VistaButton();
             this.buttonToggleIsCommercial = new CSharpControls.VistaButton();
             this.buttonInsertCutPoint = new CSharpControls.VistaButton();
-            this.buttonSeekBack10s = new CSharpControls.VistaButton();
+            this.buttonSeekBackMedium = new CSharpControls.VistaButton();
             this.panel2 = new System.Windows.Forms.Panel();
             this.button3 = new System.Windows.Forms.Button();
+            this.panelGraphs = new System.Windows.Forms.Panel();
+            this.scrollBarZoom = new System.Windows.Forms.HScrollBar();
+            this.graphsUserControl1 = new ComskipToCuttermaran.GraphsUserControl();
             this.timelineUserControl1 = new ComskipToCuttermaran.TimelineUserControl();
             this.labelLoading = new System.Windows.Forms.Label();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
@@ -68,6 +71,12 @@
             this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripMenuItem1 = new System.Windows.Forms.ToolStripSeparator();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.testingToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.saveImageToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripMenuItem2 = new System.Windows.Forms.ToolStripSeparator();
+            this.normalImageToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.edgeMapToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.edgeMapStdDev5SecsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolTip = new System.Windows.Forms.ToolTip(this.components);
             this.tabControl = new System.Windows.Forms.TabControl();
             this.tabPageAnalysis = new System.Windows.Forms.TabPage();
@@ -91,6 +100,7 @@
             this.splitContainer4.Panel2.SuspendLayout();
             this.splitContainer4.SuspendLayout();
             this.panel2.SuspendLayout();
+            this.panelGraphs.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.tabControl.SuspendLayout();
             this.tabPageAnalysis.SuspendLayout();
@@ -195,9 +205,9 @@
             // 
             // olvColumnFrameNumber
             // 
-            this.olvColumnFrameNumber.AspectName = "StartFrameNumber";
+            this.olvColumnFrameNumber.AspectName = "StartFieldNumber";
             this.olvColumnFrameNumber.CellPadding = null;
-            this.olvColumnFrameNumber.Text = "Frame";
+            this.olvColumnFrameNumber.Text = "Field";
             this.olvColumnFrameNumber.Width = 50;
             // 
             // olvColumnLength
@@ -272,15 +282,15 @@
             this.olvColumnStrictLength.CellPadding = null;
             this.olvColumnStrictLength.Text = "Strict";
             // 
-            // labelPreviewFrame
+            // labelCurrentPosition
             // 
-            this.labelPreviewFrame.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.labelPreviewFrame.AutoSize = true;
-            this.labelPreviewFrame.Location = new System.Drawing.Point(4, 306);
-            this.labelPreviewFrame.Name = "labelPreviewFrame";
-            this.labelPreviewFrame.Size = new System.Drawing.Size(38, 13);
-            this.labelPreviewFrame.TabIndex = 1;
-            this.labelPreviewFrame.Text = "Frame";
+            this.labelCurrentPosition.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.labelCurrentPosition.AutoSize = true;
+            this.labelCurrentPosition.Location = new System.Drawing.Point(4, 306);
+            this.labelCurrentPosition.Name = "labelCurrentPosition";
+            this.labelCurrentPosition.Size = new System.Drawing.Size(38, 13);
+            this.labelCurrentPosition.TabIndex = 1;
+            this.labelCurrentPosition.Text = "Frame";
             // 
             // splitContainer3
             // 
@@ -298,6 +308,7 @@
             // 
             // splitContainer3.Panel2
             // 
+            this.splitContainer3.Panel2.Controls.Add(this.panelGraphs);
             this.splitContainer3.Panel2.Controls.Add(this.timelineUserControl1);
             this.splitContainer3.Size = new System.Drawing.Size(821, 628);
             this.splitContainer3.SplitterDistance = 325;
@@ -314,20 +325,20 @@
             // 
             this.splitContainer4.Panel1.Controls.Add(this.objectListViewBlocks);
             this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToEnd);
-            this.splitContainer4.Panel1.Controls.Add(this.labelPreviewFrame);
+            this.splitContainer4.Panel1.Controls.Add(this.labelCurrentPosition);
             this.splitContainer4.Panel1.Controls.Add(this.buttonPlay);
             this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToStart);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToNextKeyFrame);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToPreviousKeyFrame);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekForwardSmall);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekBackSmall);
             this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToNextFrame);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekBack60s);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekBackLarge);
             this.splitContainer4.Panel1.Controls.Add(this.buttonSeekToPreviousFrame);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekForward60s);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekForward10s);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekForwardLarge);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekForwardMedium);
             this.splitContainer4.Panel1.Controls.Add(this.buttonSave);
             this.splitContainer4.Panel1.Controls.Add(this.buttonToggleIsCommercial);
             this.splitContainer4.Panel1.Controls.Add(this.buttonInsertCutPoint);
-            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekBack10s);
+            this.splitContainer4.Panel1.Controls.Add(this.buttonSeekBackMedium);
             // 
             // splitContainer4.Panel2
             // 
@@ -353,41 +364,39 @@
             this.buttonSeekToEnd.Click += new System.EventHandler(this.buttonSeekToEnd_Click);
             this.buttonSeekToEnd.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekToNextKeyFrame
+            // buttonSeekForwardSmall
             // 
-            this.buttonSeekToNextKeyFrame.AllowDefaultButtonBorder = true;
-            this.buttonSeekToNextKeyFrame.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekToNextKeyFrame.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekToNextKeyFrame.ButtonText = ">>";
-            this.buttonSeekToNextKeyFrame.CornerRadius = 2;
-            this.buttonSeekToNextKeyFrame.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekToNextKeyFrame.Font = new System.Drawing.Font("Segoe UI Semibold", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonSeekToNextKeyFrame.Location = new System.Drawing.Point(370, 83);
-            this.buttonSeekToNextKeyFrame.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
-            this.buttonSeekToNextKeyFrame.Name = "buttonSeekToNextKeyFrame";
-            this.buttonSeekToNextKeyFrame.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekToNextKeyFrame.TabIndex = 8;
-            this.toolTip.SetToolTip(this.buttonSeekToNextKeyFrame, "Move to the next key frame (Shift+Right)");
-            this.buttonSeekToNextKeyFrame.Click += new System.EventHandler(this.buttonSeekToNextKeyFrame_Click);
-            this.buttonSeekToNextKeyFrame.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekForwardSmall.AllowDefaultButtonBorder = true;
+            this.buttonSeekForwardSmall.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekForwardSmall.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekForwardSmall.ButtonText = "+1s";
+            this.buttonSeekForwardSmall.CornerRadius = 2;
+            this.buttonSeekForwardSmall.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekForwardSmall.Location = new System.Drawing.Point(370, 83);
+            this.buttonSeekForwardSmall.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
+            this.buttonSeekForwardSmall.Name = "buttonSeekForwardSmall";
+            this.buttonSeekForwardSmall.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekForwardSmall.TabIndex = 8;
+            this.toolTip.SetToolTip(this.buttonSeekForwardSmall, "Move to the next key frame (Shift+Right)");
+            this.buttonSeekForwardSmall.Click += new System.EventHandler(this.buttonSeekForwardSmall_Click);
+            this.buttonSeekForwardSmall.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekToPreviousKeyFrame
+            // buttonSeekBackSmall
             // 
-            this.buttonSeekToPreviousKeyFrame.AllowDefaultButtonBorder = true;
-            this.buttonSeekToPreviousKeyFrame.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekToPreviousKeyFrame.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekToPreviousKeyFrame.ButtonText = "<<";
-            this.buttonSeekToPreviousKeyFrame.CornerRadius = 2;
-            this.buttonSeekToPreviousKeyFrame.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekToPreviousKeyFrame.Font = new System.Drawing.Font("Segoe UI Semibold", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonSeekToPreviousKeyFrame.Location = new System.Drawing.Point(334, 83);
-            this.buttonSeekToPreviousKeyFrame.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
-            this.buttonSeekToPreviousKeyFrame.Name = "buttonSeekToPreviousKeyFrame";
-            this.buttonSeekToPreviousKeyFrame.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekToPreviousKeyFrame.TabIndex = 5;
-            this.toolTip.SetToolTip(this.buttonSeekToPreviousKeyFrame, "Move to the previous key frame (Shift+Left)");
-            this.buttonSeekToPreviousKeyFrame.Click += new System.EventHandler(this.buttonSeekToPreviousKeyFrame_Click);
-            this.buttonSeekToPreviousKeyFrame.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekBackSmall.AllowDefaultButtonBorder = true;
+            this.buttonSeekBackSmall.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekBackSmall.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekBackSmall.ButtonText = "-1s";
+            this.buttonSeekBackSmall.CornerRadius = 2;
+            this.buttonSeekBackSmall.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekBackSmall.Location = new System.Drawing.Point(334, 83);
+            this.buttonSeekBackSmall.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
+            this.buttonSeekBackSmall.Name = "buttonSeekBackSmall";
+            this.buttonSeekBackSmall.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekBackSmall.TabIndex = 5;
+            this.toolTip.SetToolTip(this.buttonSeekBackSmall, "Move to the previous key frame (Shift+Left)");
+            this.buttonSeekBackSmall.Click += new System.EventHandler(this.buttonSeekBackSmall_Click);
+            this.buttonSeekBackSmall.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
             // buttonSeekToNextFrame
             // 
@@ -407,22 +416,22 @@
             this.buttonSeekToNextFrame.Click += new System.EventHandler(this.buttonSeekToNextFrame_Click);
             this.buttonSeekToNextFrame.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekBack60s
+            // buttonSeekBackLarge
             // 
-            this.buttonSeekBack60s.AllowDefaultButtonBorder = true;
-            this.buttonSeekBack60s.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekBack60s.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekBack60s.ButtonText = "-60s";
-            this.buttonSeekBack60s.CornerRadius = 2;
-            this.buttonSeekBack60s.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekBack60s.Location = new System.Drawing.Point(334, 29);
-            this.buttonSeekBack60s.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
-            this.buttonSeekBack60s.Name = "buttonSeekBack60s";
-            this.buttonSeekBack60s.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekBack60s.TabIndex = 3;
-            this.toolTip.SetToolTip(this.buttonSeekBack60s, "Move backward 60 seconds (Ctrl+Shift+Left)");
-            this.buttonSeekBack60s.Click += new System.EventHandler(this.buttonSeekBack60s_Click);
-            this.buttonSeekBack60s.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekBackLarge.AllowDefaultButtonBorder = true;
+            this.buttonSeekBackLarge.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekBackLarge.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekBackLarge.ButtonText = "-60s";
+            this.buttonSeekBackLarge.CornerRadius = 2;
+            this.buttonSeekBackLarge.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekBackLarge.Location = new System.Drawing.Point(334, 29);
+            this.buttonSeekBackLarge.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
+            this.buttonSeekBackLarge.Name = "buttonSeekBackLarge";
+            this.buttonSeekBackLarge.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekBackLarge.TabIndex = 3;
+            this.toolTip.SetToolTip(this.buttonSeekBackLarge, "Move backward 60 seconds (Ctrl+Shift+Left)");
+            this.buttonSeekBackLarge.Click += new System.EventHandler(this.buttonSeekBackLarge_Click);
+            this.buttonSeekBackLarge.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
             // buttonSeekToPreviousFrame
             // 
@@ -442,39 +451,39 @@
             this.buttonSeekToPreviousFrame.Click += new System.EventHandler(this.buttonSeekToPreviousFrame_Click);
             this.buttonSeekToPreviousFrame.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekForward60s
+            // buttonSeekForwardLarge
             // 
-            this.buttonSeekForward60s.AllowDefaultButtonBorder = true;
-            this.buttonSeekForward60s.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekForward60s.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekForward60s.ButtonText = "+60s";
-            this.buttonSeekForward60s.CornerRadius = 2;
-            this.buttonSeekForward60s.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekForward60s.Location = new System.Drawing.Point(370, 29);
-            this.buttonSeekForward60s.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
-            this.buttonSeekForward60s.Name = "buttonSeekForward60s";
-            this.buttonSeekForward60s.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekForward60s.TabIndex = 10;
-            this.toolTip.SetToolTip(this.buttonSeekForward60s, "Move forward 60 seconds (Ctrl+Shift+Right)");
-            this.buttonSeekForward60s.Click += new System.EventHandler(this.buttonSeekForward60s_Click);
-            this.buttonSeekForward60s.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekForwardLarge.AllowDefaultButtonBorder = true;
+            this.buttonSeekForwardLarge.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekForwardLarge.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekForwardLarge.ButtonText = "+60s";
+            this.buttonSeekForwardLarge.CornerRadius = 2;
+            this.buttonSeekForwardLarge.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekForwardLarge.Location = new System.Drawing.Point(370, 29);
+            this.buttonSeekForwardLarge.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
+            this.buttonSeekForwardLarge.Name = "buttonSeekForwardLarge";
+            this.buttonSeekForwardLarge.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekForwardLarge.TabIndex = 10;
+            this.toolTip.SetToolTip(this.buttonSeekForwardLarge, "Move forward 60 seconds (Ctrl+Shift+Right)");
+            this.buttonSeekForwardLarge.Click += new System.EventHandler(this.buttonSeekForwardLarge_Click);
+            this.buttonSeekForwardLarge.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekForward10s
+            // buttonSeekForwardMedium
             // 
-            this.buttonSeekForward10s.AllowDefaultButtonBorder = true;
-            this.buttonSeekForward10s.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekForward10s.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekForward10s.ButtonText = "+10s";
-            this.buttonSeekForward10s.CornerRadius = 2;
-            this.buttonSeekForward10s.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekForward10s.Location = new System.Drawing.Point(369, 56);
-            this.buttonSeekForward10s.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
-            this.buttonSeekForward10s.Name = "buttonSeekForward10s";
-            this.buttonSeekForward10s.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekForward10s.TabIndex = 9;
-            this.toolTip.SetToolTip(this.buttonSeekForward10s, "Move forward 10 seconds (Ctrl+Right)");
-            this.buttonSeekForward10s.Click += new System.EventHandler(this.buttonSeekForward10s_Click);
-            this.buttonSeekForward10s.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekForwardMedium.AllowDefaultButtonBorder = true;
+            this.buttonSeekForwardMedium.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekForwardMedium.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekForwardMedium.ButtonText = "+10s";
+            this.buttonSeekForwardMedium.CornerRadius = 2;
+            this.buttonSeekForwardMedium.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekForwardMedium.Location = new System.Drawing.Point(369, 56);
+            this.buttonSeekForwardMedium.Margin = new System.Windows.Forms.Padding(0, 2, 2, 2);
+            this.buttonSeekForwardMedium.Name = "buttonSeekForwardMedium";
+            this.buttonSeekForwardMedium.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekForwardMedium.TabIndex = 9;
+            this.toolTip.SetToolTip(this.buttonSeekForwardMedium, "Move forward 10 seconds (Ctrl+Right)");
+            this.buttonSeekForwardMedium.Click += new System.EventHandler(this.buttonSeekForwardMedium_Click);
+            this.buttonSeekForwardMedium.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
             // buttonSave
             // 
@@ -529,22 +538,22 @@
             this.buttonInsertCutPoint.Click += new System.EventHandler(this.buttonInsertCutPoint_Click);
             this.buttonInsertCutPoint.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
-            // buttonSeekBack10s
+            // buttonSeekBackMedium
             // 
-            this.buttonSeekBack10s.AllowDefaultButtonBorder = true;
-            this.buttonSeekBack10s.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSeekBack10s.BackColor = System.Drawing.Color.Transparent;
-            this.buttonSeekBack10s.ButtonText = "-10s";
-            this.buttonSeekBack10s.CornerRadius = 2;
-            this.buttonSeekBack10s.DialogResult = System.Windows.Forms.DialogResult.None;
-            this.buttonSeekBack10s.Location = new System.Drawing.Point(334, 56);
-            this.buttonSeekBack10s.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
-            this.buttonSeekBack10s.Name = "buttonSeekBack10s";
-            this.buttonSeekBack10s.Size = new System.Drawing.Size(36, 23);
-            this.buttonSeekBack10s.TabIndex = 4;
-            this.toolTip.SetToolTip(this.buttonSeekBack10s, "Move backward 10 seconds (Ctrl+Left)");
-            this.buttonSeekBack10s.Click += new System.EventHandler(this.buttonSeekBack10s_Click);
-            this.buttonSeekBack10s.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
+            this.buttonSeekBackMedium.AllowDefaultButtonBorder = true;
+            this.buttonSeekBackMedium.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.buttonSeekBackMedium.BackColor = System.Drawing.Color.Transparent;
+            this.buttonSeekBackMedium.ButtonText = "-10s";
+            this.buttonSeekBackMedium.CornerRadius = 2;
+            this.buttonSeekBackMedium.DialogResult = System.Windows.Forms.DialogResult.None;
+            this.buttonSeekBackMedium.Location = new System.Drawing.Point(334, 56);
+            this.buttonSeekBackMedium.Margin = new System.Windows.Forms.Padding(2, 2, 0, 2);
+            this.buttonSeekBackMedium.Name = "buttonSeekBackMedium";
+            this.buttonSeekBackMedium.Size = new System.Drawing.Size(36, 23);
+            this.buttonSeekBackMedium.TabIndex = 4;
+            this.toolTip.SetToolTip(this.buttonSeekBackMedium, "Move backward 10 seconds (Ctrl+Left)");
+            this.buttonSeekBackMedium.Click += new System.EventHandler(this.buttonSeekBackMedium_Click);
+            this.buttonSeekBackMedium.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             // 
             // panel2
             // 
@@ -571,21 +580,55 @@
             this.button3.Visible = false;
             this.button3.Click += new System.EventHandler(this.button3_Click);
             // 
+            // panelGraphs
+            // 
+            this.panelGraphs.AutoScroll = true;
+            this.panelGraphs.BackColor = System.Drawing.Color.Black;
+            this.panelGraphs.Controls.Add(this.scrollBarZoom);
+            this.panelGraphs.Controls.Add(this.graphsUserControl1);
+            this.panelGraphs.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panelGraphs.Location = new System.Drawing.Point(0, 30);
+            this.panelGraphs.Margin = new System.Windows.Forms.Padding(0);
+            this.panelGraphs.Name = "panelGraphs";
+            this.panelGraphs.Size = new System.Drawing.Size(817, 265);
+            this.panelGraphs.TabIndex = 1;
+            // 
+            // scrollBarZoom
+            // 
+            this.scrollBarZoom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.scrollBarZoom.LargeChange = 1;
+            this.scrollBarZoom.Location = new System.Drawing.Point(730, 247);
+            this.scrollBarZoom.Maximum = 2;
+            this.scrollBarZoom.Name = "scrollBarZoom";
+            this.scrollBarZoom.Size = new System.Drawing.Size(87, 18);
+            this.scrollBarZoom.TabIndex = 0;
+            this.toolTip.SetToolTip(this.scrollBarZoom, "Adjust the zoom level of the graphs");
+            this.scrollBarZoom.Value = 2;
+            this.scrollBarZoom.ValueChanged += new System.EventHandler(this.scrollBarZoom_ValueChanged);
+            // 
+            // graphsUserControl1
+            // 
+            this.graphsUserControl1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.graphsUserControl1.BackColor = System.Drawing.Color.Black;
+            this.graphsUserControl1.Location = new System.Drawing.Point(0, 0);
+            this.graphsUserControl1.Margin = new System.Windows.Forms.Padding(0);
+            this.graphsUserControl1.Name = "graphsUserControl1";
+            this.graphsUserControl1.Size = new System.Drawing.Size(815, 186);
+            this.graphsUserControl1.TabIndex = 0;
+            this.graphsUserControl1.ZoomLevel = 2;
+            this.graphsUserControl1.SelectedFieldChanged += new ComskipToCuttermaran.GraphsUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
+            // 
             // timelineUserControl1
             // 
-            this.timelineUserControl1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.timelineUserControl1.BackColor = System.Drawing.Color.Black;
-            this.timelineUserControl1.CsvProcessor = null;
-            this.timelineUserControl1.FrameNumber = -1;
+            this.timelineUserControl1.Dock = System.Windows.Forms.DockStyle.Top;
             this.timelineUserControl1.Location = new System.Drawing.Point(0, 0);
+            this.timelineUserControl1.Margin = new System.Windows.Forms.Padding(0);
             this.timelineUserControl1.Name = "timelineUserControl1";
-            this.timelineUserControl1.SecondsVisible = 10D;
-            this.timelineUserControl1.Size = new System.Drawing.Size(817, 297);
+            this.timelineUserControl1.Size = new System.Drawing.Size(817, 30);
             this.timelineUserControl1.TabIndex = 0;
-            this.timelineUserControl1.VideoMediaFile = null;
-            this.timelineUserControl1.SelectedFrameChanged += new ComskipToCuttermaran.TimelineUserControl.SelectedFrameChangedCallback(this.timelineUserControl1_SelectedFrameChanged);
+            this.timelineUserControl1.SelectedFieldChanged += new ComskipToCuttermaran.TimelineUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
             // 
             // labelLoading
             // 
@@ -602,7 +645,8 @@
             // menuStrip1
             // 
             this.menuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.fileToolStripMenuItem});
+            this.fileToolStripMenuItem,
+            this.testingToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
             this.menuStrip1.Size = new System.Drawing.Size(831, 24);
@@ -644,6 +688,53 @@
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             this.exitToolStripMenuItem.Size = new System.Drawing.Size(103, 22);
             this.exitToolStripMenuItem.Text = "Exit";
+            // 
+            // testingToolStripMenuItem
+            // 
+            this.testingToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.saveImageToolStripMenuItem,
+            this.toolStripMenuItem2,
+            this.normalImageToolStripMenuItem,
+            this.edgeMapToolStripMenuItem,
+            this.edgeMapStdDev5SecsToolStripMenuItem});
+            this.testingToolStripMenuItem.Name = "testingToolStripMenuItem";
+            this.testingToolStripMenuItem.Size = new System.Drawing.Size(58, 20);
+            this.testingToolStripMenuItem.Text = "Testing";
+            // 
+            // saveImageToolStripMenuItem
+            // 
+            this.saveImageToolStripMenuItem.Name = "saveImageToolStripMenuItem";
+            this.saveImageToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.saveImageToolStripMenuItem.Text = "Save Image";
+            this.saveImageToolStripMenuItem.Click += new System.EventHandler(this.saveImageToolStripMenuItem_Click);
+            // 
+            // toolStripMenuItem2
+            // 
+            this.toolStripMenuItem2.Name = "toolStripMenuItem2";
+            this.toolStripMenuItem2.Size = new System.Drawing.Size(201, 6);
+            // 
+            // normalImageToolStripMenuItem
+            // 
+            this.normalImageToolStripMenuItem.Checked = true;
+            this.normalImageToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.normalImageToolStripMenuItem.Name = "normalImageToolStripMenuItem";
+            this.normalImageToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.normalImageToolStripMenuItem.Text = "Normal Image";
+            this.normalImageToolStripMenuItem.Click += new System.EventHandler(this.imageTypeToolStripMenuItem_Click);
+            // 
+            // edgeMapToolStripMenuItem
+            // 
+            this.edgeMapToolStripMenuItem.Name = "edgeMapToolStripMenuItem";
+            this.edgeMapToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.edgeMapToolStripMenuItem.Text = "Edge map";
+            this.edgeMapToolStripMenuItem.Click += new System.EventHandler(this.imageTypeToolStripMenuItem_Click);
+            // 
+            // edgeMapStdDev5SecsToolStripMenuItem
+            // 
+            this.edgeMapStdDev5SecsToolStripMenuItem.Name = "edgeMapStdDev5SecsToolStripMenuItem";
+            this.edgeMapStdDev5SecsToolStripMenuItem.Size = new System.Drawing.Size(204, 22);
+            this.edgeMapStdDev5SecsToolStripMenuItem.Text = "Edge map Std Dev 5 secs";
+            this.edgeMapStdDev5SecsToolStripMenuItem.Click += new System.EventHandler(this.imageTypeToolStripMenuItem_Click);
             // 
             // toolTip
             // 
@@ -806,6 +897,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer4)).EndInit();
             this.splitContainer4.ResumeLayout(false);
             this.panel2.ResumeLayout(false);
+            this.panelGraphs.ResumeLayout(false);
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             this.tabControl.ResumeLayout(false);
@@ -824,7 +916,7 @@
         private CSharpControls.VistaButton buttonSeekToStart;
         private CSharpControls.VistaButton buttonPlay;
         private BrightIdeasSoftware.ObjectListView objectListViewBlocks;
-        private System.Windows.Forms.Label labelPreviewFrame;
+        private System.Windows.Forms.Label labelCurrentPosition;
         private System.Windows.Forms.SplitContainer splitContainer3;
         private System.Windows.Forms.SplitContainer splitContainer4;
         private System.Windows.Forms.Panel panel2;
@@ -837,14 +929,14 @@
         private TimelineUserControl timelineUserControl1;
         private System.Windows.Forms.Button button3;
         private CSharpControls.VistaButton buttonSeekToEnd;
-        private CSharpControls.VistaButton buttonSeekToNextKeyFrame;
+        private CSharpControls.VistaButton buttonSeekForwardSmall;
         private CSharpControls.VistaButton buttonSeekToNextFrame;
         private CSharpControls.VistaButton buttonSeekToPreviousFrame;
-        private CSharpControls.VistaButton buttonSeekToPreviousKeyFrame;
-        private CSharpControls.VistaButton buttonSeekForward10s;
-        private CSharpControls.VistaButton buttonSeekBack10s;
-        private CSharpControls.VistaButton buttonSeekForward60s;
-        private CSharpControls.VistaButton buttonSeekBack60s;
+        private CSharpControls.VistaButton buttonSeekBackSmall;
+        private CSharpControls.VistaButton buttonSeekForwardMedium;
+        private CSharpControls.VistaButton buttonSeekBackMedium;
+        private CSharpControls.VistaButton buttonSeekForwardLarge;
+        private CSharpControls.VistaButton buttonSeekBackLarge;
         private System.Windows.Forms.ToolTip toolTip;
         private System.Windows.Forms.TabControl tabControl;
         private System.Windows.Forms.TabPage tabPageAnalysis;
@@ -871,5 +963,14 @@
         private CSharpControls.VistaButton buttonInsertCutPoint;
         private CSharpControls.VistaButton buttonToggleIsCommercial;
         private CSharpControls.VistaButton buttonSave;
+        private System.Windows.Forms.ToolStripMenuItem testingToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem saveImageToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator toolStripMenuItem2;
+        private System.Windows.Forms.ToolStripMenuItem normalImageToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem edgeMapToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem edgeMapStdDev5SecsToolStripMenuItem;
+        private System.Windows.Forms.Panel panelGraphs;
+        private GraphsUserControl graphsUserControl1;
+        private System.Windows.Forms.HScrollBar scrollBarZoom;
     }
 }

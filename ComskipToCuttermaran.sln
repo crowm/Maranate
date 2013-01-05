@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HyperPropertyDescriptor", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ObjectListView2010", "Libs\ObjectListViewSVN\ObjectListView2010.csproj", "{18FEDA0C-D147-4286-B39A-01204808106A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageProcessing", "ImageProcessor\ImageProcessing.csproj", "{CABDF999-8AB6-4E30-838D-29146B7C0183}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -107,6 +109,16 @@ Global
 		{18FEDA0C-D147-4286-B39A-01204808106A}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{18FEDA0C-D147-4286-B39A-01204808106A}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{18FEDA0C-D147-4286-B39A-01204808106A}.Release|x86.ActiveCfg = Release|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{CABDF999-8AB6-4E30-838D-29146B7C0183}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

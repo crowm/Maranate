@@ -73,31 +73,23 @@ namespace ComskipToCuttermaran
                 return -1;
             }
 
-            if (videoFilename == null)
-            {
-                videoFilename = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".m2v";
-            }
-            if (audioFilename == null)
-            {
-                audioFilename = Path.GetDirectoryName(videoFilename) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".mp2";
-                if (!File.Exists(audioFilename))
-                {
-                    audioFilename = Path.GetDirectoryName(videoFilename) + "\\" + Path.GetFileNameWithoutExtension(inputName) + ".ac3";
-                }
-            }
-
             string extension = Path.GetExtension(inputName);
 
             if (extension.Equals(".txt", StringComparison.CurrentCultureIgnoreCase))
             {
                 return ProcessTxtFile(inputName, videoFilename, audioFilename, frameOffset);
             }
-            else if (extension.Equals(".csv", StringComparison.CurrentCultureIgnoreCase))
+            else if (extension.Equals(".csv", StringComparison.CurrentCultureIgnoreCase) ||
+                     extension.Equals(".mpg", StringComparison.CurrentCultureIgnoreCase) ||
+                     extension.Equals(".ts", StringComparison.CurrentCultureIgnoreCase) ||
+                     extension.Equals(".m2v", StringComparison.CurrentCultureIgnoreCase) ||
+                     extension.Equals(".mp2", StringComparison.CurrentCultureIgnoreCase) ||
+                     extension.Equals(".ac3", StringComparison.CurrentCultureIgnoreCase))
             {
                 if (showWindow)
                     return ShowWindow(inputName, videoFilename, audioFilename, frameOffset);
                 else
-                    return ProcessCsvFile(inputName, videoFilename, audioFilename, frameOffset);
+                    return ProcessStatisticsFromFile(inputName, videoFilename, audioFilename, frameOffset);
             }
             else
             {
@@ -106,6 +98,7 @@ namespace ComskipToCuttermaran
             }
         }
 
+        #region "Console"
         [System.Runtime.InteropServices.DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
         [System.Runtime.InteropServices.DllImport("kernel32.dll")]
@@ -120,6 +113,7 @@ namespace ComskipToCuttermaran
             }
             return false;
         }
+        #endregion
 
 
         private static void PrintUsage()
@@ -137,6 +131,10 @@ namespace ComskipToCuttermaran
 
         private static int ProcessTxtFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
         {
+            var filenames = FileDetect.FillFilenames(inputName, videoFilename, audioFilename);
+            videoFilename = filenames.videoFilename;
+            audioFilename = filenames.audioFilename;
+
             string filename = Path.GetFileNameWithoutExtension(inputName);
             string outputName = Path.GetDirectoryName(inputName) + "\\" + filename + ".cpf";
             using (var input = new StreamReader(inputName))
@@ -213,14 +211,17 @@ namespace ComskipToCuttermaran
             return 0;
         }
 
-        private static int ProcessCsvFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
+        private static int ProcessStatisticsFromFile(string inputName, string videoFilename, string audioFilename, int frameOffset)
         {
             string logFile = Path.GetDirectoryName(inputName) + "\\" + Path.GetFileNameWithoutExtension(inputName) + "_scoring.log";
             using (var output = new StreamWriter(logFile, false))
             {
             }
 
-            var processor = new ComskipCsvProcessor(inputName, videoFilename, audioFilename, frameOffset);
+            var filenames = FileDetect.FillFilenames(inputName, videoFilename, audioFilename);
+
+            Statistics.IStatisticsProcessor processor;
+            processor = new Statistics.StatisticsProcessor(filenames, frameOffset);
             processor.Log += (message) => {
                 Console.WriteLine(message);
                 using (var output = new StreamWriter(logFile, true))
@@ -240,10 +241,73 @@ namespace ComskipToCuttermaran
 
         private static int ShowWindow(string inputName, string videoFilename, string audioFilename, int frameOffset)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            var form = new MainForm(inputName, videoFilename, audioFilename, frameOffset);
-            Application.Run(form);
+            if (true)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                var form = new MainForm(inputName, videoFilename, audioFilename, frameOffset);
+                Application.Run(form);
+            }
+            else
+            {
+                var _filenames = FileDetect.FillFilenames(inputName, videoFilename, audioFilename);
+
+                var _videoFile = new MediaFile();
+                _videoFile.Resolution = MediaFile.ResolutionOption.Full;
+                _videoFile.OutputRGBImage = false;
+                _videoFile.OutputYData = true;
+                _videoFile.OutputYImage = false;
+                _videoFile.Open(_filenames.videoFilename);
+
+                int lastPrintSeconds = 0;
+
+                int frameCount = 0;
+                var stopwatch = new System.Diagnostics.Stopwatch();
+                stopwatch.Start();
+                for (int fieldNumber = 0; fieldNumber < _videoFile.TotalFields; fieldNumber++)
+                //for (int fieldNumber = 0; fieldNumber < 1000; fieldNumber++)
+                {
+                    var frameField = _videoFile.GetVideoFrameField(fieldNumber, MediaFile.SeekModes.Accurate);
+                    //frameField.YData.GetBitmap().Save(@"D:\temp\image-" + frameField.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                    frameField.Dispose();
+
+                    long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                    int elapsedSeconds = (int)(elapsedMilliseconds / 1000);
+                    if (elapsedSeconds != lastPrintSeconds)
+                    {
+                        lastPrintSeconds = elapsedSeconds;
+                        var fps = frameCount * 1000.0f / (float)stopwatch.ElapsedMilliseconds;
+                        Console.WriteLine("Frame: " + frameCount.ToString() + "  FPS: " + fps.ToString("0.00"));
+                    }
+
+                    frameCount++;
+                }
+
+                //for (int fieldNumber = 500; fieldNumber < 504; fieldNumber++)
+                //{
+                //    var frameField = _videoFile.GetVideoFrameField(fieldNumber, MediaFile.SeekModes.Accurate);
+                //    //frameField.Image.Save(@"D:\temp\image-" + frameField.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                //    //frameField.YData.GetBitmap().Save(@"D:\temp\image-" + frameField.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                //    frameField.YData.GetFloatData().GetBitmap().Save(@"D:\temp\image-" + frameField.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+
+                //    var yData = frameField.YData;
+                //    var floatData = frameField.YData.GetFloatData();
+
+                //    stopwatch.Restart();
+                //    for (int test = 0; test < 1000; test++)
+                //    {
+                //        //var image = floatData.GetBitmap();
+                //        var image = yData.GetBitmap();
+
+                //        image = null;
+                //        //GC.Collect();
+                //    }
+                //    Console.WriteLine("Elapsed: " + stopwatch.Elapsed.ToString());
+
+                //    frameField.Dispose();
+                //}
+            }
+
             return 0;
         }
 

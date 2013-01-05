@@ -9,7 +9,7 @@ using SharpFFmpeg;
 
 namespace ComskipToCuttermaran
 {
-    public class MediaFile : IDisposable
+    public partial class MediaFile : IDisposable
     {
         string _filename;
 
@@ -24,28 +24,19 @@ namespace ComskipToCuttermaran
         FFmpeg.AVCodecContext _videoCodecContext;
         IntPtr _pVideoCodecDecoder;
         IntPtr _pFrameOrig;
-        IntPtr _pFrameRGB;
         FFmpeg.AVFrame _frameOrig;
-        FFmpeg.AVFrame _frameRGB;
 
-        const int AV_NUM_DATA_POINTERS = 8;
-        IntPtr _pScaleSrc;
-        IntPtr _pScaleSrcStride;
-        IntPtr _pScaleDst;
-        IntPtr _pScaleDstStride;
-        IntPtr _pSwsContext = IntPtr.Zero;
+        SwsScaler _scalerY;
+        SwsScaler _scalerRGB;
 
-        int _frameSizeBytesRGB;
-        IntPtr _pFrameBytes;
         IntPtr _pPacket;
         FFmpeg.AVPacket _lastPacket;
 
         long? _videoFrameFirstDTS;
-        long? _videoFrameDTSDuration;
+        long? _videoFieldDTSDuration;
 
-        Frame _firstFrame = null;
-        Frame _pendingFrame = null;
-        int _lastFrameNumber = -1;
+        PendingFrame _pendingFrame = null;
+        int _lastFieldNumber = -1;
 
         // Audio
         //int _audioStreamIndex;
@@ -61,11 +52,46 @@ namespace ComskipToCuttermaran
         public bool OutputYData { get; set; }
         public bool OutputYImage { get; set; }
 
-        public class Frame : IDisposable
+        private class PendingFrame : IDisposable
+        {
+            public FrameField[] Fields { get; set; }
+            public int CurrentIndex { get; set; }
+
+            public bool IsKeyFrame
+            {
+                get
+                {
+                    return (Fields != null) ? ((CurrentIndex == 0) && (Fields[0].AVFrame.key_frame != 0)) : false;
+                }
+            }
+
+            public PendingFrame()
+            {
+                CurrentIndex = 0;
+            }
+
+            public void Dispose()
+            {
+                if (Fields != null)
+                {
+                    foreach (var field in Fields)
+                    {
+                        if (field != null)
+                        {
+                            field.Dispose();
+                        }
+                    }
+                    Fields = null;
+                }
+            }
+        }
+        public class FrameField : IDisposable
         {
             public Image Image { get; set; }
-            public byte[] YData { get; set; }
+            public ImageProcessing.YData YData { get; set; }
             public int FrameNumber { get; set; }
+            public int FieldNumber { get; set; }
+            public int FieldIndex { get; set; }
             public long PTS { get; set; }
             public double Seconds { get; set; }
             public long FilePosition { get; set; }
@@ -127,7 +153,7 @@ namespace ComskipToCuttermaran
             clone.OutputRGBImage = OutputRGBImage;
             clone.OutputYData = OutputYData;
             clone.OutputYImage = OutputYImage;
-            clone._lastFrameNumber = _lastFrameNumber;
+            clone._lastFieldNumber = _lastFieldNumber;
             clone.Open(_filename);
             return clone;
         }
@@ -149,31 +175,25 @@ namespace ComskipToCuttermaran
                 Marshal.FreeHGlobal(ppFormatContext);
             }
 
-            DisposeFrame(ref _firstFrame);
             DisposeFrame(ref _pendingFrame);
 
-            FreeHGlobal(ref _pScaleSrc);
-            FreeHGlobal(ref _pScaleSrcStride);
-            FreeHGlobal(ref _pScaleDst);
-            FreeHGlobal(ref _pScaleDstStride);
-
-            FreeHGlobal(ref _pFrameBytes);
             FreeHGlobal(ref _pPacket);
 
-            if (_pSwsContext != IntPtr.Zero)
+            if (_scalerY != null)
             {
-                FFmpeg.SwScale.sws_freeContext(_pSwsContext);
-                _pSwsContext = IntPtr.Zero;
+                _scalerY.Dispose();
+                _scalerY = null;
             }
+            if (_scalerRGB != null)
+            {
+                _scalerRGB.Dispose();
+                _scalerRGB = null;
+            }
+
             if (_pFrameOrig != IntPtr.Zero)
             {
                 FFmpeg.avcodec_free_frame(ref _pFrameOrig);
                 _pFrameOrig = IntPtr.Zero;
-            }
-            if (_pFrameRGB != IntPtr.Zero)
-            {
-                FFmpeg.avcodec_free_frame(ref _pFrameRGB);
-                _pFrameRGB = IntPtr.Zero;
             }
 
             if (_pFormatContext != IntPtr.Zero)
@@ -182,7 +202,7 @@ namespace ComskipToCuttermaran
             }
         }
 
-        private void DisposeFrame(ref Frame frame)
+        private static void DisposeFrame(ref PendingFrame frame)
         {
             if (frame != null)
             {
@@ -190,7 +210,7 @@ namespace ComskipToCuttermaran
                 frame = null;
             }
         }
-        private void FreeHGlobal(ref IntPtr p)
+        private static void FreeHGlobal(ref IntPtr p)
         {
             if (p != IntPtr.Zero)
             {
@@ -238,8 +258,7 @@ namespace ComskipToCuttermaran
 
                     if (Resolution != ResolutionOption.Full)
                     {
-                        var offset = Marshal.OffsetOf(typeof(FFmpeg.AVCodecContext), "lowres");
-                        Marshal.WriteInt32(_pVideoCodecContext, offset.ToInt32(), (int)Resolution);
+                        Marshal.WriteInt32(_pVideoCodecContext, Marshal.OffsetOf(typeof(FFmpeg.AVCodecContext), "lowres").ToInt32(), (int)Resolution);
                     }
 
                     _pVideoCodecDecoder = FFmpeg.avcodec_find_decoder(_videoCodecContext.codec_id);
@@ -252,38 +271,20 @@ namespace ComskipToCuttermaran
 
                     _videoCodecContext = (FFmpeg.AVCodecContext)Marshal.PtrToStructure(stream.codec, typeof(FFmpeg.AVCodecContext));
 
-                    //Allocate buffers
-                    _frameSizeBytesRGB = FFmpeg.avpicture_get_size((int)FFmpeg.AVPixelFormat.PIX_FMT_BGR24, _videoCodecContext.width, _videoCodecContext.height);
+                    //Allocate buffers for original frame
                     _pFrameOrig = FFmpeg.avcodec_alloc_frame();
-                    _pFrameRGB = FFmpeg.avcodec_alloc_frame();
 
-                    _pFrameBytes = Marshal.AllocHGlobal(_frameSizeBytesRGB);
-                    RtlZeroMemory(_pFrameBytes, _frameSizeBytesRGB);
-                    ret = FFmpeg.avpicture_fill(_pFrameRGB, _pFrameBytes, FFmpeg.AVPixelFormat.PIX_FMT_BGR24, _videoCodecContext.width, _videoCodecContext.height);
-                    if (ret < 0)
-                        throw new Exception("Failed to fill picture: " + ret.ToString());
-                    _frameRGB = (FFmpeg.AVFrame)Marshal.PtrToStructure(_pFrameRGB, typeof(FFmpeg.AVFrame));
-                    
+                    //Allocate buffers for RGB frame
+                    _scalerY = new SwsScaler(_videoCodecContext);
+                    _scalerY.DstPixelFormat = SwsScaler.PixelFormat.Y;
+
+                    //Allocate buffers for RGB frame
+                    _scalerRGB = new SwsScaler(_videoCodecContext);
+
+                    // Allocate packet memory
                     int sizeOfPacket = Marshal.SizeOf(typeof(FFmpeg.AVPacket));
                     _pPacket = Marshal.AllocHGlobal(sizeOfPacket);
                     RtlZeroMemory(_pPacket, sizeOfPacket);
-
-                    int avDataPointersBytes = AV_NUM_DATA_POINTERS * 4;
-                    _pScaleSrc = Marshal.AllocHGlobal(avDataPointersBytes);
-                    _pScaleSrcStride = Marshal.AllocHGlobal(avDataPointersBytes);
-                    _pScaleDst = Marshal.AllocHGlobal(avDataPointersBytes);
-                    _pScaleDstStride = Marshal.AllocHGlobal(avDataPointersBytes);
-                    RtlZeroMemory(_pScaleSrc, avDataPointersBytes);
-                    RtlZeroMemory(_pScaleSrcStride, avDataPointersBytes);
-                    RtlZeroMemory(_pScaleDst, avDataPointersBytes);
-                    RtlZeroMemory(_pScaleDstStride, avDataPointersBytes);
-
-                    Marshal.WriteIntPtr(_pScaleDst, 0, _pFrameBytes);
-
-                    for (int i = 0; i < AV_NUM_DATA_POINTERS; i++)
-                    {
-                        Marshal.WriteInt32(_pScaleDstStride, 4 * i, _frameRGB.linesize[i]);
-                    }
 
                 }
                 //else if (codecContext.codec_type == FFmpeg.CodecType.CODEC_TYPE_AUDIO)
@@ -302,19 +303,19 @@ namespace ComskipToCuttermaran
                 throw new Exception("Failed to seek to first frame: " + ret.ToString());
             FFmpeg.avcodec_flush_buffers(_pVideoCodecContext);
 
-            _firstFrame = ReadVideoFrame();
-            _pendingFrame = null;
+            // Read the first frame to set initial dts values
+            ReadVideoFrame();
 
-            if (_lastFrameNumber == -1)
+            if (_lastFieldNumber == -1)
             {
                 if (_filename == @"F:\Convert\ComskipTest\Chuck - 4x02 - Retune\(2012-09-10 03-55) Chuck - 4x02 - Chuck Versus the Suitcase.m2v")
                 {
-                    _lastFrameNumber = 80148;
+                    _lastFieldNumber = 160295;
                 }
                 else
                 {
                     SeekToPTS(Int64.MaxValue, false);
-                    _lastFrameNumber = _pendingFrame.FrameNumber;
+                    _lastFieldNumber = _pendingFrame.Fields.Last().FieldNumber;
                 }
             }
 
@@ -322,49 +323,102 @@ namespace ComskipToCuttermaran
             return;
         }
 
-        public int TotalFrames
+        public int Width
+        {
+            get { return _videoCodecContext.width; }
+        }
+
+        public int Height
+        {
+            get { return _videoCodecContext.height; }
+        }
+
+        public int FieldsPerFrame
         {
             get
             {
-                return _lastFrameNumber;
+                return _videoCodecContext.ticks_per_frame;
             }
         }
 
-        public double FrameDuration
+        public int FieldsPerSecond
         {
             get
             {
-                return _videoFrameDTSDuration.Value * _videoCodecContext.pkt_timebase.num / (double)_videoCodecContext.pkt_timebase.den;
+                var fields = (int)(_videoCodecContext.time_base.den / (double)_videoCodecContext.time_base.num);
+                fields -= (fields % _videoCodecContext.ticks_per_frame);
+                return fields;
             }
         }
 
-        private long PTSPerFrame
+        public int TotalFields
         {
             get
             {
-                return (_videoCodecContext.pkt_timebase.den * _videoCodecContext.pkt_timebase.num * _videoCodecContext.ticks_per_frame) / (_videoCodecContext.time_base.den * _videoCodecContext.time_base.num);
+                return _lastFieldNumber + 1;
             }
         }
 
-        private void SeekToFrame(int frameNumber, SeekModes seekMode)
+        public double FieldDuration
         {
-            if ((_pendingFrame != null) && (_pendingFrame.FrameNumber == frameNumber))
+            get
             {
-                if ((seekMode == SeekModes.Accurate) || (_pendingFrame.AVFrame.key_frame != 0))
-                    return;
+                return _videoFieldDTSDuration.Value * _videoCodecContext.pkt_timebase.num / (double)_videoCodecContext.pkt_timebase.den;
+            }
+        }
+
+        private long PTSPerField
+        {
+            get
+            {
+                return (_videoCodecContext.pkt_timebase.den * _videoCodecContext.pkt_timebase.num) / (_videoCodecContext.time_base.den * _videoCodecContext.time_base.num);
+            }
+        }
+
+        private void SeekToField(int fieldNumber, SeekModes seekMode)
+        {
+            if ((_pendingFrame != null) && (_pendingFrame.Fields != null))
+            {
+                if ((seekMode == SeekModes.Accurate) || (_pendingFrame.IsKeyFrame))
+                {
+                    for (int fieldIndex = 0; fieldIndex < _pendingFrame.Fields.Length; fieldIndex++)
+                    {
+                        var field = _pendingFrame.Fields[fieldIndex];
+                        if ((field.FieldNumber == fieldNumber))
+                        {
+                            _pendingFrame.CurrentIndex = fieldIndex;
+                            return;
+                        }
+                    }
+                }
             }
 
-            long pts = PTSPerFrame * frameNumber;
+            long pts = PTSPerField * fieldNumber;
 
             SeekToPTS(pts, seekMode);
         }
 
         private void SeekToTime(double seconds, SeekModes seekMode)
         {
-            if ((_pendingFrame != null) && (_pendingFrame.Seconds == seconds))
+            if ((_pendingFrame != null) && (_pendingFrame.Fields != null))
             {
-                if ((seekMode == SeekModes.Accurate) || (_pendingFrame.AVFrame.key_frame != 0))
-                    return;
+                if (seekMode == SeekModes.Accurate)
+                {
+                    for (int fieldIndex = 0; fieldIndex < _pendingFrame.Fields.Length; fieldIndex++)
+                    {
+                        var field = _pendingFrame.Fields[fieldIndex];
+                        if ((field.Seconds == seconds))
+                        {
+                            _pendingFrame.CurrentIndex = fieldIndex;
+                            return;
+                        }
+                    }
+                }
+                else
+                {
+                    if (_pendingFrame.IsKeyFrame)
+                        return;
+                }
             }
 
             long pts = (long)(seconds * _videoCodecContext.pkt_timebase.den / (double)_videoCodecContext.pkt_timebase.num);
@@ -381,7 +435,7 @@ namespace ComskipToCuttermaran
             else if (seekMode == SeekModes.NextKeyFrame)
             {
                 SeekToPTS(pts, false);
-                while (_pendingFrame.AVFrame.key_frame == 0)
+                while (!_pendingFrame.IsKeyFrame)
                 {
                     var previousFrame = _pendingFrame;
                     _pendingFrame = ReadVideoFrame();
@@ -399,12 +453,30 @@ namespace ComskipToCuttermaran
             }
         }
 
-        private void SeekToPTS(long pts, bool stopAtKeyframe)
+        private void SeekToPTS(long pts, bool stopAtKeyframe, bool forceSeek = false)
         {
-            if ((_pendingFrame != null) && (_pendingFrame.PTS == pts))
-                return;
+            if (forceSeek == false)
+            {
+                if ((_pendingFrame != null) && (_pendingFrame.Fields != null))
+                {
+                    for (int fieldIndex = 0; fieldIndex < _pendingFrame.Fields.Length; fieldIndex++)
+                    {
+                        var field = _pendingFrame.Fields[fieldIndex];
+                        if ((field.PTS == pts))
+                        {
+                            _pendingFrame.CurrentIndex = fieldIndex;
+                            return;
+                        }
+                    }
+                }
+            }
 
             long seekPTS = pts;
+            seekPTS = seekPTS / PTSPerField / _videoCodecContext.ticks_per_frame * _videoCodecContext.ticks_per_frame * PTSPerField;
+            seekPTS += _videoFrameFirstDTS.Value;
+
+            var originalPendingFrame = _pendingFrame;
+            long lastSeekFilePosition = -1L;
 
             while (true)
             {
@@ -416,38 +488,86 @@ namespace ComskipToCuttermaran
                     throw new Exception("Failed to seek to first frame: " + ret.ToString());
                 FFmpeg.avcodec_flush_buffers(_pVideoCodecContext);
 
-                DisposeFrame(ref _pendingFrame);
+                var pb = (FFmpeg.ByteIOContext)Marshal.PtrToStructure(_formatContext.pb, typeof(FFmpeg.ByteIOContext));
+                if (lastSeekFilePosition != -1L)
+                {
+                    if ((lastSeekFilePosition == pb.pos) && (seekPTS != 0))
+                    {
+                        seekPTS -= (PTSPerField * _videoCodecContext.ticks_per_frame);
+                        continue;
+                    }
+                }
+                lastSeekFilePosition = pb.pos;
+
+                if (_pendingFrame != originalPendingFrame)
+                    DisposeFrame(ref _pendingFrame);
 
                 _pendingFrame = ReadVideoFrame();
 
-                if ((_pendingFrame == null) || (_pendingFrame.PTS <= pts))
+                if (_pendingFrame != null)
                 {
-                    while (_pendingFrame.PTS < pts)
+                    if (_pendingFrame.Fields.First().PTS == pts)
+                        return;
+
+                    if (_pendingFrame.Fields.First().PTS > pts)
                     {
-                        if (stopAtKeyframe && (_pendingFrame.AVFrame.key_frame != 0))
-                            break;
+                        if (seekPTS == 0)
+                            return;
+
+                        seekPTS -= PTSPerField * _videoCodecContext.ticks_per_frame;
+
+                        continue;
+                    }
+
+                    while (true)
+                    {
+                        if (stopAtKeyframe && _pendingFrame.IsKeyFrame)
+                        {
+                            _pendingFrame.CurrentIndex = 0;
+                            return;
+                        }
+
+                        for (int fieldIndex = 0; fieldIndex < _pendingFrame.Fields.Length; fieldIndex++)
+                        {
+                            var field = _pendingFrame.Fields[fieldIndex];
+
+                            if (field.PTS >= pts)
+                            {
+                                _pendingFrame.CurrentIndex = fieldIndex;
+                                return;
+                            }
+                        }
 
                         var previousFrame = _pendingFrame;
                         _pendingFrame = ReadVideoFrame();
                         if (_pendingFrame == null)
                         {
                             _pendingFrame = previousFrame;
+                            _pendingFrame.CurrentIndex = _pendingFrame.Fields.Length - 1;
                             return;
                         }
-                        DisposeFrame(ref previousFrame);
+                        if (previousFrame != originalPendingFrame)
+                            DisposeFrame(ref previousFrame);
                     }
-                    break;
                 }
 
-                if (seekPTS == 0)
-                    break;
-
-                long gopPTS = PTSPerFrame * _videoCodecContext.gop_size;
-                seekPTS -= gopPTS;
             }
         }
 
-        private Frame ReadVideoFrame()
+        public void TestSeekToField(long fieldNumber)
+        {
+            long pts = fieldNumber * PTSPerField;
+
+            SeekToPTS(pts, true, true);
+            
+            if (_pendingFrame != null)
+            {
+                var diff = _pendingFrame.Fields[0].FieldNumber - fieldNumber;
+                System.Diagnostics.Debug.WriteLine(fieldNumber.ToString() + ", " + _pendingFrame.Fields[0].FieldNumber.ToString() + ", " + diff.ToString() + ((diff > 0) ? " ++++++" : ""));
+            }
+        }
+
+        private PendingFrame ReadVideoFrame()
         {
             int ret;
 
@@ -457,8 +577,8 @@ namespace ComskipToCuttermaran
                 if (ret < 0)
                 {
                     var packet = new FFmpeg.AVPacket();
-                    packet.dts = _lastPacket.dts + PTSPerFrame;
-                    packet.pts = _lastPacket.pts + PTSPerFrame;
+                    packet.dts = _lastPacket.dts + PTSPerField * _videoCodecContext.ticks_per_frame;
+                    packet.pts = _lastPacket.pts + PTSPerField * _videoCodecContext.ticks_per_frame;
                     packet.duration = _lastPacket.duration;
                     int sizeOfPacket = Marshal.SizeOf(packet);
                     var pPacket = Marshal.AllocHGlobal(sizeOfPacket);
@@ -495,151 +615,110 @@ namespace ComskipToCuttermaran
             return null;
         }
 
-        private Frame ProcessFrame()
+        private PendingFrame ProcessFrame()
         {
-            int ret;
-
             _frameOrig = (FFmpeg.AVFrame)Marshal.PtrToStructure(_pFrameOrig, typeof(FFmpeg.AVFrame));
 
             IntPtr pStream = Marshal.ReadIntPtr(_formatContext.streams, _videoStreamIndex * 4);
             var stream = (FFmpeg.AVStream)Marshal.PtrToStructure(pStream, typeof(FFmpeg.AVStream));
             _videoCodecContext = (FFmpeg.AVCodecContext)Marshal.PtrToStructure(stream.codec, typeof(FFmpeg.AVCodecContext));
 
-            byte[] yData = null;
-            Bitmap image = null;
-
-            //---------- Start Save YUV Image ----------
-            if (OutputYData || OutputYImage)
-            {
-                var YBytes = (_frameOrig.linesize[0]) * _frameOrig.height;
-                yData = new byte[YBytes];
-                Marshal.Copy(_frameOrig.data[0], yData, 0, YBytes);
-
-                if (OutputYImage)
-                {
-                    var bitmapDataSize = _frameOrig.width * _frameOrig.height / 2;
-                    var bitmapData = new long[bitmapDataSize];
-
-                    for (int y = 0; y < _frameOrig.height; y++)
-                    {
-                        for (int x = 0; x < _frameOrig.width; x+=2)
-                        {
-                            int i = x + (y * _frameOrig.linesize[0]);
-                            byte color1 = yData[i];
-                            byte color2 = yData[i + 1];
-
-                            int dstIndex = (x + (y * _frameOrig.width)) / 2;
-                            bitmapData[dstIndex] = (long)color1 |
-                                                  ((long)color1 << 8) |
-                                                  ((long)color1 << 16) |
-                                                          (255L << 24) |
-                                                  ((long)color2 << 32) |
-                                                  ((long)color2 << 40) |
-                                                  ((long)color2 << 48) |
-                                                          (255L << 56);
-                        }
-                    }
-
-                    image = new System.Drawing.Bitmap(_videoCodecContext.width, _videoCodecContext.height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                    var imageData = image.LockBits(new System.Drawing.Rectangle(0, 0, _videoCodecContext.width, _videoCodecContext.height), System.Drawing.Imaging.ImageLockMode.ReadWrite, image.PixelFormat);
-                    Marshal.Copy(bitmapData, 0, imageData.Scan0, bitmapDataSize);
-                    image.UnlockBits(imageData);
-                }
-            }
-            //---------- End Save YUV Image ----------
-
-            //---------- Start Convert to RGB ----------
-            if (OutputRGBImage && !OutputYImage)
-            {
-                if (_pSwsContext == IntPtr.Zero)
-                {
-                    _pSwsContext = FFmpeg.SwScale.sws_getContext(
-                        _videoCodecContext.width, _videoCodecContext.height, _videoCodecContext.pix_fmt,
-                        _videoCodecContext.width, _videoCodecContext.height, FFmpeg.AVPixelFormat.PIX_FMT_BGR24,
-                        FFmpeg.SwScale.SWS_FLAGS.SWS_FAST_BILINEAR, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-
-                    if (_pSwsContext == IntPtr.Zero)
-                        throw new Exception("Failed to create SwScale context");
-                }
-
-                //FFmpeg.av_log_set_callback(new FFmpeg.AVLogCallback(AVLogCallback));
-
-                for (int i = 0; i < AV_NUM_DATA_POINTERS; i++)
-                {
-                    Marshal.WriteIntPtr(_pScaleSrc, 4 * i, _frameOrig.data[i]);
-                }
-
-                for (int i = 0; i < AV_NUM_DATA_POINTERS; i++)
-                {
-                    Marshal.WriteInt32(_pScaleSrcStride, 4 * i, _frameOrig.linesize[i]);
-                }
-
-                ret = FFmpeg.SwScale.sws_scale(_pSwsContext, _pScaleSrc, _pScaleSrcStride, 0, _videoCodecContext.height, _pScaleDst, _pScaleDstStride);
-                if (ret < 0)
-                    throw new Exception("Failed to scale frame: " + ret.ToString());
-
-                if (image != null)
-                    image.Dispose();
-                image = new System.Drawing.Bitmap(_videoCodecContext.width, _videoCodecContext.height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-                var imageData = image.LockBits(new System.Drawing.Rectangle(0, 0, _videoCodecContext.width, _videoCodecContext.height), System.Drawing.Imaging.ImageLockMode.WriteOnly, image.PixelFormat);
-                memcpy(imageData.Scan0, _pFrameBytes, _frameSizeBytesRGB);
-                image.UnlockBits(imageData);
-            }
-
             if (_videoFrameFirstDTS == null)
                 _videoFrameFirstDTS = _frameOrig.pkt_dts;
-            if (_videoFrameDTSDuration == null)
-                _videoFrameDTSDuration = _frameOrig.pkt_duration;
+            if (_videoFieldDTSDuration == null)
+                _videoFieldDTSDuration = _frameOrig.pkt_duration / _videoCodecContext.ticks_per_frame;
 
-            var frame = new Frame();
-            frame.Image = image;
-            //frame.Image.Save(@"D:\temp\image.png", System.Drawing.Imaging.ImageFormat.Png);
-            frame.YData = yData;
-            frame.PTS = (_frameOrig.pkt_dts - _videoFrameFirstDTS.Value);
-            frame.Seconds = frame.PTS * _videoCodecContext.pkt_timebase.num / (double)_videoCodecContext.pkt_timebase.den;
-            frame.FrameNumber = (int)(frame.PTS / _videoFrameDTSDuration.Value);
-            frame.FilePosition = _frameOrig.pkt_pos;
-            frame.AVFrame = _frameOrig;
+            var fieldList = new List<FrameField>();
+
+            //---------- Start YUV Image ----------
+            if (OutputYData || OutputYImage)
+            {
+                _scalerY.ProcessImage(_pFrameOrig, _frameOrig);
+            }
+            //---------- End YUV Image ----------
+
+            //---------- Start RGB Image ----------
+            if (OutputRGBImage && !OutputYImage)
+            {
+                _scalerRGB.ProcessImage(_pFrameOrig, _frameOrig);
+            }
+            //---------- End RGB Image ----------
+
+            for (int fieldIndex = 0; fieldIndex < _videoCodecContext.ticks_per_frame; fieldIndex++)
+            {
+                var field = new FrameField();
+
+                if (OutputYData || OutputYImage)
+                {
+                    field.YData = _scalerY.GetYData(fieldIndex);
+                    if (OutputYImage)
+                    {
+                        field.Image = _scalerY.GetImage(fieldIndex);
+                        //field.Image.Save(@"D:\temp\image.png", System.Drawing.Imaging.ImageFormat.Png);
+                    }
+                }
+                
+                if (OutputRGBImage && !OutputYImage)
+                {
+                    field.Image = _scalerRGB.GetImage(fieldIndex);
+                    //field.Image.Save(@"D:\temp\image.png", System.Drawing.Imaging.ImageFormat.Png);
+                }
+
+                field.PTS = (_frameOrig.pkt_dts - _videoFrameFirstDTS.Value) + (fieldIndex * _videoFieldDTSDuration.Value);
+                field.Seconds = field.PTS * _videoCodecContext.pkt_timebase.num / (double)_videoCodecContext.pkt_timebase.den;
+                field.FieldIndex = fieldIndex;
+                field.FieldNumber = (int)(field.PTS / _videoFieldDTSDuration.Value);
+                field.FrameNumber = (int)(field.FieldNumber / _videoCodecContext.ticks_per_frame);
+                field.FilePosition = _frameOrig.pkt_pos;
+                field.AVFrame = _frameOrig;
+
+                fieldList.Add(field);
+            }
+
+            var frame = new PendingFrame();
+            frame.Fields = fieldList.ToArray();
 
             return frame;
         }
 
         [DllImport("msvcrt.dll", EntryPoint = "memcpy", CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
-        public static extern IntPtr memcpy(IntPtr dest, IntPtr src, int count);
+        static extern IntPtr memcpy(IntPtr dest, IntPtr src, int count);
 
         [DllImport("kernel32.dll")]
         static extern void RtlZeroMemory(IntPtr dst, int length);
 
-        public Frame GetVideoFrame(int frameNumber, SeekModes seekMode = SeekModes.Accurate)
+        public FrameField GetVideoFrameField(int fieldNumber, SeekModes seekMode = SeekModes.Accurate)
         {
-            Frame frame = null;
-            SeekToFrame(frameNumber, seekMode);
+            FrameField frame = null;
+            SeekToField(fieldNumber, seekMode);
             if (_pendingFrame != null)
             {
-                frame = _pendingFrame;
+                frame = _pendingFrame.Fields[_pendingFrame.CurrentIndex];
                 //frame.Image.Save(@"D:\temp\image-" + frame.FrameNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
             }
-            _pendingFrame = ReadVideoFrame();
+            _pendingFrame.CurrentIndex++;
+            if (_pendingFrame.CurrentIndex >= _pendingFrame.Fields.Length)
+                _pendingFrame = ReadVideoFrame();
             return frame;
         }
 
-        public List<Frame> GetVideoFrames(List<int> frameNumbers)
+        public List<FrameField> GetVideoFrameFields(List<int> fieldNumbers)
         {
-            var result = new List<Frame>();
+            var result = new List<FrameField>();
 
-            frameNumbers = (from f in frameNumbers orderby f select f).ToList();
-            foreach (var frameNumber in frameNumbers)
+            fieldNumbers = (from f in fieldNumbers orderby f select f).ToList();
+            foreach (var frameNumber in fieldNumbers)
             {
-                if ((frameNumber < 0) || (frameNumber >= TotalFrames))
+                if ((frameNumber < 0) || (frameNumber >= TotalFields))
                 {
                     result.Add(null);
                     continue;
                 }
 
-                SeekToFrame(frameNumber, SeekModes.Accurate);
+                SeekToField(frameNumber, SeekModes.Accurate);
                 if (_pendingFrame != null)
                 {
-                    Frame frame = _pendingFrame;
+                    FrameField frame = _pendingFrame.Fields[_pendingFrame.CurrentIndex];
                     //frame.Image.Save(@"D:\temp\image-" + frame.FrameNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
                     result.Add(frame);
                 }
@@ -647,29 +726,23 @@ namespace ComskipToCuttermaran
                 {
                     result.Add(null);
                 }
-                _pendingFrame = ReadVideoFrame();
+                _pendingFrame.CurrentIndex++;
+                if (_pendingFrame.CurrentIndex >= _pendingFrame.Fields.Length)
+                    _pendingFrame = ReadVideoFrame();
             }
 
             return result;
         }
 
-        public List<Frame> GetVideoFrames(int firstFrameNumber, int lastFrameNumber)
+        public List<FrameField> GetVideoFrameFields(int firstFieldNumber, int lastFieldNumber)
         {
             var frameNumbers = new List<int>();
-            for (int frameNumber = firstFrameNumber; frameNumber <= lastFrameNumber; frameNumber++)
+            for (int frameNumber = firstFieldNumber; frameNumber <= lastFieldNumber; frameNumber++)
             {
                 frameNumbers.Add(frameNumber);
             }
 
-            return GetVideoFrames(frameNumbers);
-        }
-
-        [DllImport("msvcrt.dll", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.Cdecl)]
-        static extern int sprintf(StringBuilder buffer, string format, IntPtr args);
-
-        private static void AVLogCallback(IntPtr avcl, int level, string format, params string[] args)
-        {
-            Console.WriteLine(format);
+            return GetVideoFrameFields(frameNumbers);
         }
 
 

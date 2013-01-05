@@ -7,25 +7,25 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using System.Threading;
+using ComskipToCuttermaran.Statistics;
 
 namespace ComskipToCuttermaran
 {
     public partial class MainForm : SavedLocationForm
     {
-        string _inputName;
-        string _videoFilename;
-        string _audioFilename;
+        FileDetect.Filenames _filenames;
         int _frameOffset;
-        ComskipCsvProcessor _csvProcessor;
+        StatisticsProcessor _csvProcessor;
         MediaFile _videoFile;
 
-        int _currentFrameIndex = 0;
+        double[] _seekTimes = new double[] { 1, 10, 60 };
+
+        int _currentFieldIndex = 0;
 
         public MainForm(string inputName, string videoFilename, string audioFilename, int frameOffset)
         {
-            _inputName = inputName;
-            _videoFilename = videoFilename;
-            _audioFilename = audioFilename;
+            _filenames = FileDetect.FillFilenames(inputName, videoFilename, audioFilename);
+
             _frameOffset = frameOffset;
 
             this.MouseWheel += new MouseEventHandler(MainForm_MouseWheel);
@@ -36,7 +36,7 @@ namespace ComskipToCuttermaran
 
             objectListViewBlocks.RowFormatter = delegate(BrightIdeasSoftware.OLVListItem item)
             {
-                var block = item.RowObject as ComskipCsvProcessor.Block;
+                var block = item.RowObject as ComskipToCuttermaran.Statistics.Block;
                 if (block == null)
                     return;
 
@@ -79,6 +79,7 @@ namespace ComskipToCuttermaran
 
             };
 
+            //button3.Visible = true;
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -170,10 +171,11 @@ namespace ComskipToCuttermaran
         {
             this.Invoke(new Action(() =>
                 {
-                    SetPreviewFrame(null);
+                    SetPreviewField(null);
                     objectListViewBlocks.SetObjects(null);
                     UpdateButtons();
                     timelineUserControl1.CloseFiles();
+                    graphsUserControl1.CloseFiles();
 
                     _csvProcessor = null;
 
@@ -195,7 +197,7 @@ namespace ComskipToCuttermaran
                     labelLoading.Visible = true;
                 }));
 
-            _csvProcessor = new ComskipCsvProcessor(_inputName, _videoFilename, _audioFilename, _frameOffset);
+            _csvProcessor = new StatisticsProcessor(_filenames, _frameOffset);
             _csvProcessor.Settings = Settings.Current.DetectionSettings;
             _csvProcessor.Log += new Action<string>(_csvProcessor_Log);
             _csvProcessor.Process();
@@ -204,12 +206,14 @@ namespace ComskipToCuttermaran
 
             _videoFile = new MediaFile();
             _videoFile.Resolution = MediaFile.ResolutionOption.Full;
+            _videoFile.OutputYData = true;
             _videoFile.OutputRGBImage = true;
-            _videoFile.Open(_videoFilename);
+            //_videoFile.OutputYImage = true;
+            _videoFile.Open(_filenames.videoFilename);
 
-            var frame = _videoFile.GetVideoFrame(_currentFrameIndex);
-            //if (frame.Image != null)
-            //    frame.Image.Save(@"D:\temp\image-" + frame.FrameNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+            var frameField = _videoFile.GetVideoFrameField(_currentFieldIndex);
+            //if (frameField.Image != null)
+            //    frameField.Image.Save(@"D:\temp\image-" + frameField.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
 
             this.Invoke(new Action(() =>
                 {
@@ -219,11 +223,20 @@ namespace ComskipToCuttermaran
                     objectListViewBlocks.SetObjects(_csvProcessor.Data.Blocks);
                     UpdateButtons();
 
-                    timelineUserControl1.CsvProcessor = _csvProcessor;
-                    timelineUserControl1.VideoMediaFile = _videoFile.Clone(MediaFile.ResolutionOption.Quarter);
-                    timelineUserControl1.SetDirty();
+                    timelineUserControl1.StatisticsProcessor = _csvProcessor;
+                    timelineUserControl1.TotalFields = _videoFile.TotalFields;
+                    timelineUserControl1.FieldsPerSecond = _videoFile.FieldsPerSecond;
 
-                    SetPreviewFrame(frame);
+                    var graphsVideoFile = _videoFile.Clone(MediaFile.ResolutionOption.Full);
+                    graphsVideoFile.OutputYImage = false;
+                    graphsVideoFile.OutputRGBImage = true;
+                    graphsUserControl1.StatisticsProcessor = _csvProcessor;
+                    graphsUserControl1.VideoMediaFile = graphsVideoFile;
+                    graphsUserControl1.SetDirty();
+
+                    timelineUserControl1.SecondsVisible = graphsUserControl1.SecondsVisible;
+
+                    SetPreviewField(frameField);
 
                     splitContainer3.Enabled = true;
                 }));
@@ -237,32 +250,47 @@ namespace ComskipToCuttermaran
                 }));
         }
 
-        private void SetPreviewFrame(MediaFile.Frame frame)
+        private void SetPreviewField(MediaFile.FrameField field)
         {
-            if (frame != null)
+            if (field != null)
             {
-                pictureBoxPreview.Image = frame.Image;
-                //if (frame.Image != null)
-                //    frame.Image.Save(@"D:\temp\image-" + frame.FrameNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                if (edgeMapToolStripMenuItem.Checked)
+                {
+                    var yFloatData = field.YData.GetFloatData();
+                    var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yFloatData);
+                    var edgeImage = edgeData.GetBitmap();
 
-                var seconds = TimeSpan.FromSeconds(frame.Seconds);
+                    pictureBoxPreview.Image = edgeImage;
+                }
+                else if (edgeMapStdDev5SecsToolStripMenuItem.Checked)
+                {
+                }
+                else
+                {
+                    pictureBoxPreview.Image = field.Image;
+                }
+                //if (field.Image != null)
+                //    field.Image.Save(@"D:\temp\image-" + field.FieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+
+                var seconds = TimeSpan.FromSeconds(field.Seconds);
                 string frameType = "";
 
-                if (frame.AVFrame.pict_type != SharpFFmpeg.FFmpeg.AVPictureType.AV_PICTURE_TYPE_NONE)
+                if (field.AVFrame.pict_type != SharpFFmpeg.FFmpeg.AVPictureType.AV_PICTURE_TYPE_NONE)
                 {
-                    var pictType = frame.AVFrame.pict_type.ToString();
+                    var pictType = field.AVFrame.pict_type.ToString();
                     frameType = "[" + pictType.Substring(pictType.LastIndexOf('_') + 1) + "] ";
                 }
 
-                labelPreviewFrame.Text = "Current position: " + seconds.ToString(@"h\:mm\:ss\.fff") + "  " + frameType + frame.FrameNumber.ToString();
-                timelineUserControl1.FrameNumber = frame.FrameNumber;
+                labelCurrentPosition.Text = "Current position: " + seconds.ToString(@"h\:mm\:ss\.fff") + "  " + frameType + field.FieldNumber.ToString();
+                timelineUserControl1.FieldNumber = field.FieldNumber;
+                graphsUserControl1.FieldNumber = field.FieldNumber;
 
-                _currentFrameIndex = frame.FrameNumber;
+                _currentFieldIndex = field.FieldNumber;
             }
             else
             {
                 pictureBoxPreview.Image = null;
-                labelPreviewFrame.Text = "";
+                labelCurrentPosition.Text = "";
             }
 
             UpdateButtons();
@@ -280,20 +308,20 @@ namespace ComskipToCuttermaran
                 {
                     var stopwatch = new System.Diagnostics.Stopwatch();
                     stopwatch.Start();
-                    var firstFrame = _currentFrameIndex;
+                    var firstField = _currentFieldIndex;
 
-                    for (int i = firstFrame; i < _videoFile.TotalFrames; i++)
+                    for (int i = firstField; i < _videoFile.TotalFields; i++)
                     {
                         if (!_isPlaying)
                             break;
 
-                        var frame = _videoFile.GetVideoFrame(i);
+                        var field = _videoFile.GetVideoFrameField(i);
                         this.Invoke(new Action(() =>
                         {
-                            SetPreviewFrame(frame);
+                            SetPreviewField(field);
                         }));
 
-                        var ptsMilliseconds = (_currentFrameIndex - firstFrame) * _videoFile.FrameDuration * 1000.0;
+                        var ptsMilliseconds = (_currentFieldIndex - firstField) * _videoFile.FieldDuration * 1000.0;
                         var timeToWait = (int)(ptsMilliseconds - stopwatch.ElapsedMilliseconds);
                         if (timeToWait > 0)
                             System.Threading.Thread.Sleep(timeToWait);
@@ -308,94 +336,117 @@ namespace ComskipToCuttermaran
 
         private void button3_Click(object sender, EventArgs e)
         {
+            object updateFieldLock = new object();
+            MediaFile.FrameField updateField = null;
+            long updateFieldElapsed = 0L;
+            int updateFieldCount = 0;
+
+            var updateTimer = new System.Windows.Forms.Timer();
+            updateTimer.Interval = 20;
+            updateTimer.Tick += new EventHandler((sender2, e2) =>
+            {
+                MediaFile.FrameField field;
+                double elapsed;
+                int fieldNumber;
+                lock (updateFieldLock)
+                {
+                    field = updateField;
+                    elapsed = updateFieldElapsed;
+                    fieldNumber = updateFieldCount;
+                }
+                if (field != null)
+                {
+                    //SetPreviewFrame(frame);
+                    pictureBoxPreview.Image = field.Image;
+
+                    if (elapsed > 0.0)
+                    {
+                        var fps = 1000.0 * fieldNumber / elapsed;
+                        labelCurrentPosition.Text = fps.ToString("0.00");
+                    }
+                }
+            });
+            updateTimer.Start();
+
             RunOnBackgroundThread(() =>
             {
                 var stopwatch = new System.Diagnostics.Stopwatch();
                 stopwatch.Start();
 
-                for (int i = _videoFile.TotalFrames - 5; i < _videoFile.TotalFrames; i += 1)
+                for (int i = 0; (i < _videoFile.TotalFields); i += 1)
                 {
-                    var frames = _videoFile.GetVideoFrames(i, i);
-                    _currentFrameIndex = frames[0].FrameNumber;
-                    if (_currentFrameIndex == _videoFile.TotalFrames - 1)
-                    {
-                        this.Invoke(new Action(() =>
-                        {
-                            SetPreviewFrame(frames[0]);
+                    var field = _videoFile.GetVideoFrameField(i);
 
-                            labelPreviewFrame.Text = stopwatch.Elapsed.ToString();
-                        }));
-                    }
-                    else
+                    lock (updateFieldLock)
                     {
-                        frames[0].Dispose();
+                        updateField = field;
+                        updateFieldElapsed = stopwatch.ElapsedMilliseconds;
+                        updateFieldCount = i + 1;
                     }
-                    //System.Threading.Thread.Sleep(10);
+
+                    if (updateFieldElapsed > 5000)
+                        break;
                 }
+
+                this.Invoke(new Action(() =>
+                {
+                    updateTimer.Stop();
+                    updateTimer.Dispose();
+                }));
             });
         }
 
         private void buttonSeekToStart_Click(object sender, EventArgs e)
         {
-            _currentFrameIndex = 0;
-            var frame = _videoFile.GetVideoFrame(_currentFrameIndex);
-            SetPreviewFrame(frame);
+            _currentFieldIndex = 0;
+            var field = _videoFile.GetVideoFrameField(_currentFieldIndex);
+            SetPreviewField(field);
         }
 
         private void buttonSeekToEnd_Click(object sender, EventArgs e)
         {
-            _currentFrameIndex = _videoFile.TotalFrames - 1;
-            var frame = _videoFile.GetVideoFrame(_currentFrameIndex);
-            SetPreviewFrame(frame);
+            _currentFieldIndex = _videoFile.TotalFields - 1;
+            var field = _videoFile.GetVideoFrameField(_currentFieldIndex);
+            SetPreviewField(field);
         }
 
-        private void buttonSeekBack60s_Click(object sender, EventArgs e)
+        private void buttonSeekBackLarge_Click(object sender, EventArgs e)
         {
-            SeekOffsetSeconds(-60.0);
+            SeekOffsetSeconds(-1 * _seekTimes[2]);
         }
 
-        private void buttonSeekForward60s_Click(object sender, EventArgs e)
+        private void buttonSeekForwardLarge_Click(object sender, EventArgs e)
         {
-            SeekOffsetSeconds(+60.0);
+            SeekOffsetSeconds(_seekTimes[2]);
         }
 
-        private void buttonSeekBack10s_Click(object sender, EventArgs e)
+        private void buttonSeekBackMedium_Click(object sender, EventArgs e)
         {
-            SeekOffsetSeconds(-10.0);
+            SeekOffsetSeconds(-1 * _seekTimes[1]);
         }
 
-        private void buttonSeekForward10s_Click(object sender, EventArgs e)
+        private void buttonSeekForwardMedium_Click(object sender, EventArgs e)
         {
-            SeekOffsetSeconds(+10.0);
+            SeekOffsetSeconds(_seekTimes[1]);
         }
 
-        private void buttonSeekToPreviousKeyFrame_Click(object sender, EventArgs e)
+        private void buttonSeekBackSmall_Click(object sender, EventArgs e)
         {
-            if (_videoFile != null)
-            {
-                _currentFrameIndex--;
-                var frame = _videoFile.GetVideoFrame(_currentFrameIndex, MediaFile.SeekModes.PreviousKeyFrame);
-                SetPreviewFrame(frame);
-            }
+            SeekOffsetSeconds(-1 * _seekTimes[0]);
         }
 
-        private void buttonSeekToNextKeyFrame_Click(object sender, EventArgs e)
+        private void buttonSeekForwardSmall_Click(object sender, EventArgs e)
         {
-            if (_videoFile != null)
-            {
-                _currentFrameIndex++;
-                var frame = _videoFile.GetVideoFrame(_currentFrameIndex, MediaFile.SeekModes.NextKeyFrame);
-                SetPreviewFrame(frame);
-            }
+            SeekOffsetSeconds(_seekTimes[0]);
         }
 
         private void buttonSeekToPreviousFrame_Click(object sender, EventArgs e)
         {
             if (_videoFile != null)
             {
-                _currentFrameIndex--;
-                var frame = _videoFile.GetVideoFrame(_currentFrameIndex);
-                SetPreviewFrame(frame);
+                _currentFieldIndex--;
+                var field = _videoFile.GetVideoFrameField(_currentFieldIndex);
+                SetPreviewField(field);
             }
         }
 
@@ -403,18 +454,18 @@ namespace ComskipToCuttermaran
         {
             if (_videoFile != null)
             {
-                _currentFrameIndex++;
-                var frame = _videoFile.GetVideoFrame(_currentFrameIndex);
-                SetPreviewFrame(frame);
+                _currentFieldIndex++;
+                var field = _videoFile.GetVideoFrameField(_currentFieldIndex);
+                SetPreviewField(field);
             }
         }
 
-        private void SeekToFrame(int frameNumber)
+        private void SeekToField(int fieldNumber)
         {
             if (_videoFile != null)
             {
-                var frame = _videoFile.GetVideoFrame(frameNumber);
-                SetPreviewFrame(frame);
+                var field = _videoFile.GetVideoFrameField(fieldNumber);
+                SetPreviewField(field);
             }
         }
 
@@ -422,14 +473,14 @@ namespace ComskipToCuttermaran
         {
             if (_videoFile != null)
             {
-                int frameIndex = (int)(seconds / _videoFile.FrameDuration);
-                frameIndex += _currentFrameIndex;
-                if (frameIndex < 0)
-                    frameIndex = 0;
-                if (frameIndex >= _videoFile.TotalFrames)
-                    frameIndex = _videoFile.TotalFrames - 1;
-                var frame = _videoFile.GetVideoFrame(frameIndex);
-                SetPreviewFrame(frame);
+                int fieldIndex = (int)(seconds / _videoFile.FieldDuration);
+                fieldIndex += _currentFieldIndex;
+                if (fieldIndex < 0)
+                    fieldIndex = 0;
+                if (fieldIndex >= _videoFile.TotalFields)
+                    fieldIndex = _videoFile.TotalFields - 1;
+                var field = _videoFile.GetVideoFrameField(fieldIndex);
+                SetPreviewField(field);
             }
         }
 
@@ -438,22 +489,22 @@ namespace ComskipToCuttermaran
             if (key == Keys.Right)
             {
                 if (_currentKeyModifiers == (Keys.Control | Keys.Shift))
-                    SeekOffsetSeconds(+60.0);
+                    buttonSeekForwardLarge_Click(this, new EventArgs());
                 else if (_currentKeyModifiers == Keys.Control)
-                    SeekOffsetSeconds(+10.0);
+                    buttonSeekForwardMedium_Click(this, new EventArgs());
                 else if (_currentKeyModifiers == Keys.Shift)
-                    buttonSeekToNextKeyFrame_Click(this, new EventArgs());
+                    buttonSeekForwardSmall_Click(this, new EventArgs());
                 else
                     buttonSeekToNextFrame_Click(this, new EventArgs());
             }
             if (key == Keys.Left)
             {
                 if (_currentKeyModifiers == (Keys.Control | Keys.Shift))
-                    SeekOffsetSeconds(-60.0);
+                    buttonSeekBackLarge_Click(this, new EventArgs());
                 else if (_currentKeyModifiers == Keys.Control)
-                    SeekOffsetSeconds(-10.0);
+                    buttonSeekBackMedium_Click(this, new EventArgs());
                 else if (_currentKeyModifiers == Keys.Shift)
-                    buttonSeekToPreviousKeyFrame_Click(this, new EventArgs());
+                    buttonSeekBackSmall_Click(this, new EventArgs());
                 else
                     buttonSeekToPreviousFrame_Click(this, new EventArgs());
             }
@@ -463,7 +514,7 @@ namespace ComskipToCuttermaran
         private void MainForm_KeyDown(object sender, KeyEventArgs e)
         {
             _currentKeyModifiers = e.Modifiers;
-            Console.WriteLine("KeyDown        : " + e.KeyCode.ToString() + "    " + e.Modifiers.ToString());
+            //Console.WriteLine("KeyDown        : " + e.KeyCode.ToString() + "    " + e.Modifiers.ToString());
             if ((e.KeyCode == Keys.Left) || (e.KeyCode == Keys.Right))
             {
                 PerformSeek(e.KeyCode);
@@ -527,28 +578,28 @@ namespace ComskipToCuttermaran
         {
         }
 
-        private ComskipCsvProcessor.Block _objectListViewBlocksExpectedObject = null;
+        private ComskipToCuttermaran.Statistics.Block _objectListViewBlocksExpectedObject = null;
         private void objectListViewBlocks_SelectionChanged(object sender, EventArgs e)
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipCsvProcessor.Block;
+            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
             if (_objectListViewBlocksExpectedObject != block)
             {
                 _objectListViewBlocksExpectedObject = block;
 
                 if (block != null)
                 {
-                    SeekToFrame(block.StartFrameNumber);
+                    SeekToField(block.StartFieldNumber);
                 }
             }
             UpdateButtons();
         }
 
-        private void timelineUserControl1_SelectedFrameChanged(int frameNumber)
+        private void timelineUserControl1_SelectedFieldChanged(int fieldNumber)
         {
-            SeekToFrame(frameNumber);
+            SeekToField(fieldNumber);
             foreach (var block in _csvProcessor.Data.Blocks)
             {
-                if ((frameNumber >= block.StartFrame.FrameNumber) && (frameNumber <= block.EndFrame.FrameNumber))
+                if ((fieldNumber >= block.StartField.FieldNumber) && (fieldNumber <= block.EndField.FieldNumber))
                 {
                     _objectListViewBlocksExpectedObject = block;
                     objectListViewBlocks.SelectedObject = block;
@@ -570,6 +621,7 @@ namespace ComskipToCuttermaran
             objectListViewBlocks.SetObjects(_csvProcessor.Data.Blocks);
             UpdateButtons();
             timelineUserControl1.SetDirty();
+            graphsUserControl1.SetDirty();
         }
 
         private void buttonInsertCutPoint_Click(object sender, EventArgs e)
@@ -579,7 +631,7 @@ namespace ComskipToCuttermaran
 
         private void InsertCutPoint()
         {
-            _csvProcessor.Data.ManualCutFrames.Add(_currentFrameIndex);
+            _csvProcessor.Data.ManualCutFields.Add(_currentFieldIndex);
             Reprocess(true);
         }
 
@@ -590,7 +642,7 @@ namespace ComskipToCuttermaran
 
         private void SetIsCommercial(bool? isCommercial)
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipCsvProcessor.Block;
+            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
             if (block != null)
             {
                 if (isCommercial == null)
@@ -602,16 +654,17 @@ namespace ComskipToCuttermaran
                 else
                     block.IsCommercialOverride = !block.IsCommercial;
                 timelineUserControl1.SetDirty();
+                graphsUserControl1.SetDirty();
                 objectListViewBlocks.RefreshObject(block);
             }
         }
 
         private void UpdateButtons()
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipCsvProcessor.Block;
+            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
             if (block != null)
             {
-                buttonInsertCutPoint.Enabled = (_currentFrameIndex != block.StartFrameNumber);
+                buttonInsertCutPoint.Enabled = (_currentFieldIndex != block.StartFieldNumber);
                 buttonToggleIsCommercial.Enabled = true;
             }
             else
@@ -620,18 +673,18 @@ namespace ComskipToCuttermaran
                 buttonToggleIsCommercial.Enabled = false;
             }
 
-            var enableBack = (_videoFile != null) && (_currentFrameIndex != 0);
+            var enableBack = (_videoFile != null) && (_currentFieldIndex != 0);
             buttonSeekToStart.Enabled = enableBack;
-            buttonSeekBack60s.Enabled = enableBack;
-            buttonSeekBack10s.Enabled = enableBack;
-            buttonSeekToPreviousKeyFrame.Enabled = enableBack;
+            buttonSeekBackLarge.Enabled = enableBack;
+            buttonSeekBackMedium.Enabled = enableBack;
+            buttonSeekBackSmall.Enabled = enableBack;
             buttonSeekToPreviousFrame.Enabled = enableBack;
 
-            var enableFwd = (_videoFile != null) && (_currentFrameIndex < (_videoFile.TotalFrames - 1));
+            var enableFwd = (_videoFile != null) && (_currentFieldIndex < (_videoFile.TotalFields - 1));
             buttonSeekToEnd.Enabled = enableFwd;
-            buttonSeekForward60s.Enabled = enableFwd;
-            buttonSeekForward10s.Enabled = enableFwd;
-            buttonSeekToNextKeyFrame.Enabled = enableFwd;
+            buttonSeekForwardLarge.Enabled = enableFwd;
+            buttonSeekForwardMedium.Enabled = enableFwd;
+            buttonSeekForwardSmall.Enabled = enableFwd;
             buttonSeekToNextFrame.Enabled = enableFwd;
 
         }
@@ -648,35 +701,64 @@ namespace ComskipToCuttermaran
         private void openToolStripMenuItem_Click(object sender, EventArgs e)
         {
             OpenFileDialog dialog = new OpenFileDialog();
-            if (_inputName != null)
-                dialog.FileName = _inputName;
+            if (_filenames.inputFilename != null)
+                dialog.FileName = _filenames.inputFilename;
             dialog.Filter = "Csv Files (*.csv)|*.csv|All Files (*.*)|*.*";
             DialogResult result = dialog.ShowDialog(this);
             if (result == DialogResult.OK)
-                Open(dialog.FileName, null, null, 0);
+                Open(dialog.FileName);
         }
 
-        private void Open(string inputName, string videoFilename, string audioFilename, int frameOffset)
+        private void Open(string filename, bool loadFiles = true)
         {
-            if (videoFilename == null)
-            {
-                videoFilename = System.IO.Path.GetDirectoryName(inputName) + "\\" + System.IO.Path.GetFileNameWithoutExtension(inputName) + ".m2v";
-            }
-            if (audioFilename == null)
-            {
-                audioFilename = System.IO.Path.GetDirectoryName(videoFilename) + "\\" + System.IO.Path.GetFileNameWithoutExtension(inputName) + ".mp2";
-                if (!System.IO.File.Exists(audioFilename))
-                {
-                    audioFilename = System.IO.Path.GetDirectoryName(videoFilename) + "\\" + System.IO.Path.GetFileNameWithoutExtension(inputName) + ".ac3";
-                }
-            }
+            _filenames = FileDetect.FillFilenames(filename);
 
-            _inputName = inputName;
-            _videoFilename = videoFilename;
-            _audioFilename = audioFilename;
-            _frameOffset = frameOffset;
+            if (loadFiles)
+                RunOnBackgroundThread("Loading files", LoadFiles);
+        }
 
-            RunOnBackgroundThread("Loading files", LoadFiles);
+        private void saveImageToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            pictureBoxPreview.Image.Save(@"D:\temp\image.png", System.Drawing.Imaging.ImageFormat.Png);
+        }
+
+        private void imageTypeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            normalImageToolStripMenuItem.Checked = false;
+            edgeMapToolStripMenuItem.Checked = false;
+            edgeMapStdDev5SecsToolStripMenuItem.Checked = false;
+            var menuItem = sender as ToolStripMenuItem;
+            menuItem.Checked = true;
+
+            var field = _videoFile.GetVideoFrameField(_currentFieldIndex);
+            SetPreviewField(field);
+        }
+
+        private void scrollBarZoom_ValueChanged(object sender, EventArgs e)
+        {
+            graphsUserControl1.ZoomLevel = scrollBarZoom.Value;
+            timelineUserControl1.SecondsVisible = graphsUserControl1.SecondsVisible;
+
+            if (scrollBarZoom.Value == 2)
+            {
+                _seekTimes = new double[] { 1, 10, 60 };
+                buttonSeekBackLarge.ButtonText = "-60s";
+                buttonSeekForwardLarge.ButtonText = "+60s";
+                buttonSeekBackMedium.ButtonText = "-10s";
+                buttonSeekForwardMedium.ButtonText = "+10s";
+                buttonSeekBackSmall.ButtonText = "-1s";
+                buttonSeekForwardSmall.ButtonText = "+1s";
+            }
+            else
+            {
+                _seekTimes = new double[] { 60, 300, 900 };
+                buttonSeekBackLarge.ButtonText = "-15m";
+                buttonSeekForwardLarge.ButtonText = "+15m";
+                buttonSeekBackMedium.ButtonText = "-5m";
+                buttonSeekForwardMedium.ButtonText = "+5m";
+                buttonSeekBackSmall.ButtonText = "-1m";
+                buttonSeekForwardSmall.ButtonText = "+1m";
+            }
         }
 
     }

@@ -1,16 +1,17 @@
-﻿
-- Save and execute cuttermaran file.
+﻿- Read and write field statistics
 
-- Add titles to each stats graph.
-- Add display of current frame statistics.
+- logo detection
+
+- Update scoring to use new statistics
+
+- Execute cuttermaran file.
 
 - Add Scoring tab.
 
-- Deinterlace fields
-
-- Process images
 - Process sound
 
-- Add support for .ts
+- Check support for .ts
+
+- Try image processing using HLSL on the GPU.
 
 - Find a better name
