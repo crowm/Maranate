@@ -1,4 +1,4 @@
-﻿namespace ComskipToCuttermaran
+﻿namespace Maranate
 {
     partial class SettingsThresholdUserControl
     {

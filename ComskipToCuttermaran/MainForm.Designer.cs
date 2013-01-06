@@ -1,4 +1,4 @@
-﻿namespace ComskipToCuttermaran
+﻿namespace Maranate
 {
     partial class MainForm
     {
@@ -62,8 +62,8 @@
             this.button3 = new System.Windows.Forms.Button();
             this.scrollBarZoom = new System.Windows.Forms.HScrollBar();
             this.panelGraphs = new System.Windows.Forms.Panel();
-            this.graphsUserControl1 = new ComskipToCuttermaran.GraphsUserControl();
-            this.timelineUserControl1 = new ComskipToCuttermaran.TimelineUserControl();
+            this.graphsUserControl1 = new Maranate.GraphsUserControl();
+            this.timelineUserControl1 = new Maranate.TimelineUserControl();
             this.labelLoading = new System.Windows.Forms.Label();
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -83,9 +83,9 @@
             this.tabPageSettings = new System.Windows.Forms.TabPage();
             this.groupBoxSettings = new System.Windows.Forms.GroupBox();
             this.buttonReprocess = new CSharpControls.VistaButton();
-            this.settingsThresholdUserControlSound = new ComskipToCuttermaran.SettingsThresholdUserControl();
-            this.settingsThresholdUserControlUniform = new ComskipToCuttermaran.SettingsThresholdUserControl();
-            this.settingsThresholdUserControlBrightness = new ComskipToCuttermaran.SettingsThresholdUserControl();
+            this.settingsThresholdUserControlSound = new Maranate.SettingsThresholdUserControl();
+            this.settingsThresholdUserControlUniform = new Maranate.SettingsThresholdUserControl();
+            this.settingsThresholdUserControlBrightness = new Maranate.SettingsThresholdUserControl();
             this.tabPageMessages = new System.Windows.Forms.TabPage();
             this.richTextBoxMessages = new System.Windows.Forms.RichTextBox();
             this.timerLoading = new System.Windows.Forms.Timer(this.components);
@@ -615,7 +615,7 @@
             this.graphsUserControl1.Name = "graphsUserControl1";
             this.graphsUserControl1.Size = new System.Drawing.Size(815, 186);
             this.graphsUserControl1.TabIndex = 0;
-            this.graphsUserControl1.SelectedFieldChanged += new ComskipToCuttermaran.GraphsUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
+            this.graphsUserControl1.SelectedFieldChanged += new Maranate.GraphsUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
             // 
             // timelineUserControl1
             // 
@@ -626,7 +626,7 @@
             this.timelineUserControl1.Name = "timelineUserControl1";
             this.timelineUserControl1.Size = new System.Drawing.Size(817, 30);
             this.timelineUserControl1.TabIndex = 0;
-            this.timelineUserControl1.SelectedFieldChanged += new ComskipToCuttermaran.TimelineUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
+            this.timelineUserControl1.SelectedFieldChanged += new Maranate.TimelineUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
             // 
             // labelLoading
             // 
@@ -875,7 +875,7 @@
             this.Controls.Add(this.menuStrip1);
             this.KeyPreview = true;
             this.Name = "MainForm";
-            this.Text = "MainForm";
+            this.Text = "Maranate";
             this.Load += new System.EventHandler(this.MainForm_Load);
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyDown);
             this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.MainForm_KeyUp);

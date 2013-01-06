@@ -5,7 +5,7 @@ using System.IO;
 using System.Web;
 using System.Windows.Forms;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     class Program
     {

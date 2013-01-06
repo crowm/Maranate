@@ -7,9 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using System.Threading;
-using ComskipToCuttermaran.Statistics;
+using Maranate.Statistics;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public partial class MainForm : SavedLocationForm
     {
@@ -37,7 +37,7 @@ namespace ComskipToCuttermaran
 
             objectListViewBlocks.RowFormatter = delegate(BrightIdeasSoftware.OLVListItem item)
             {
-                var block = item.RowObject as ComskipToCuttermaran.Statistics.Block;
+                var block = item.RowObject as Block;
                 if (block == null)
                     return;
 
@@ -587,10 +587,10 @@ namespace ComskipToCuttermaran
         {
         }
 
-        private ComskipToCuttermaran.Statistics.Block _objectListViewBlocksExpectedObject = null;
+        private Block _objectListViewBlocksExpectedObject = null;
         private void objectListViewBlocks_SelectionChanged(object sender, EventArgs e)
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
+            var block = objectListViewBlocks.SelectedObject as Block;
             if (_objectListViewBlocksExpectedObject != block)
             {
                 _objectListViewBlocksExpectedObject = block;
@@ -654,7 +654,7 @@ namespace ComskipToCuttermaran
 
         private void SetIsCommercial(bool? isCommercial)
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
+            var block = objectListViewBlocks.SelectedObject as Block;
             if (block != null)
             {
                 if (isCommercial == null)
@@ -673,7 +673,7 @@ namespace ComskipToCuttermaran
 
         private void UpdateButtons()
         {
-            var block = objectListViewBlocks.SelectedObject as ComskipToCuttermaran.Statistics.Block;
+            var block = objectListViewBlocks.SelectedObject as Block;
             if (block != null)
             {
                 buttonInsertCutPoint.Enabled = (_currentFieldIndex != block.StartFieldNumber);

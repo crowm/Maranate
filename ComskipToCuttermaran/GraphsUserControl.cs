@@ -8,9 +8,9 @@ using System.Text;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading;
-using ComskipToCuttermaran.Statistics;
+using Maranate.Statistics;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public partial class GraphsUserControl : UserControl
     {

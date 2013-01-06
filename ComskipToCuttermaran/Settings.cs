@@ -2,9 +2,9 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Drawing;
-using ComskipToCuttermaran.Statistics;
+using Maranate.Statistics;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     internal class Settings
     {

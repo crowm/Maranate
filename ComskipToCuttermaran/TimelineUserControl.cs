@@ -8,9 +8,9 @@ using System.Text;
 using System.Windows.Forms;
 using System.Drawing.Drawing2D;
 using System.Threading;
-using ComskipToCuttermaran.Statistics;
+using Maranate.Statistics;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public partial class TimelineUserControl : UserControl
     {
@@ -278,8 +278,8 @@ namespace ComskipToCuttermaran
 
             _timelineRectangle = new RectangleF(0.0f, yOffset, this.ClientSize.Width, height);
 
-            ComskipToCuttermaran.Statistics.Block currentBlock = null;
-            foreach (var block in StatisticsProcessor.Data.Blocks.Reverse<ComskipToCuttermaran.Statistics.Block>())
+            Maranate.Statistics.Block currentBlock = null;
+            foreach (var block in StatisticsProcessor.Data.Blocks.Reverse<Maranate.Statistics.Block>())
             {
                 if ((currentBlock == null) && (block.StartFieldNumber <= FieldNumber))
                     currentBlock = block;

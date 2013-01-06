@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public partial class ErrorForm : BaseForm
     {

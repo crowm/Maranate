@@ -8,8 +8,8 @@
     <ProjectGuid>{290C34F1-0E6F-4587-B179-264F43703048}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ComskipToCuttermaran</RootNamespace>
-    <AssemblyName>ComskipToCuttermaran</AssemblyName>
+    <RootNamespace>Maranate</RootNamespace>
+    <AssemblyName>Maranate</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>

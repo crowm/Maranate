@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using SharpFFmpeg;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public partial class MediaFile : IDisposable
     {

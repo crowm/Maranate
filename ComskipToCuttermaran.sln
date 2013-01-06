@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComskipToCuttermaran", "ComskipToCuttermaran\ComskipToCuttermaran.csproj", "{290C34F1-0E6F-4587-B179-264F43703048}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Maranate", "ComskipToCuttermaran\Maranate.csproj", "{290C34F1-0E6F-4587-B179-264F43703048}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpFFmpeg", "SharpFFmpeg\SharpFFmpeg.csproj", "{11E4451C-A61D-4680-AC23-D6E1391B3262}"
 EndProject

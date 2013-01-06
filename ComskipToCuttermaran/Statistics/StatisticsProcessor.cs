@@ -5,7 +5,7 @@ using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace ComskipToCuttermaran.Statistics
+namespace Maranate.Statistics
 {
     public class StatisticsProcessor : Statistics.IStatisticsProcessor
     {

@@ -5,7 +5,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Drawing;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public class SavedLocationForm : BaseForm
     {

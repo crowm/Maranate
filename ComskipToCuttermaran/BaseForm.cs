@@ -8,7 +8,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 using CSharpControls;
 
-namespace ComskipToCuttermaran
+namespace Maranate
 {
     public class BaseForm : Form
     {
