@@ -60,8 +60,8 @@
             this.buttonSeekBackMedium = new CSharpControls.VistaButton();
             this.panel2 = new System.Windows.Forms.Panel();
             this.button3 = new System.Windows.Forms.Button();
-            this.panelGraphs = new System.Windows.Forms.Panel();
             this.scrollBarZoom = new System.Windows.Forms.HScrollBar();
+            this.panelGraphs = new System.Windows.Forms.Panel();
             this.graphsUserControl1 = new ComskipToCuttermaran.GraphsUserControl();
             this.timelineUserControl1 = new ComskipToCuttermaran.TimelineUserControl();
             this.labelLoading = new System.Windows.Forms.Label();
@@ -308,6 +308,7 @@
             // 
             // splitContainer3.Panel2
             // 
+            this.splitContainer3.Panel2.Controls.Add(this.scrollBarZoom);
             this.splitContainer3.Panel2.Controls.Add(this.panelGraphs);
             this.splitContainer3.Panel2.Controls.Add(this.timelineUserControl1);
             this.splitContainer3.Size = new System.Drawing.Size(821, 628);
@@ -580,24 +581,11 @@
             this.button3.Visible = false;
             this.button3.Click += new System.EventHandler(this.button3_Click);
             // 
-            // panelGraphs
-            // 
-            this.panelGraphs.AutoScroll = true;
-            this.panelGraphs.BackColor = System.Drawing.Color.Black;
-            this.panelGraphs.Controls.Add(this.scrollBarZoom);
-            this.panelGraphs.Controls.Add(this.graphsUserControl1);
-            this.panelGraphs.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelGraphs.Location = new System.Drawing.Point(0, 30);
-            this.panelGraphs.Margin = new System.Windows.Forms.Padding(0);
-            this.panelGraphs.Name = "panelGraphs";
-            this.panelGraphs.Size = new System.Drawing.Size(817, 265);
-            this.panelGraphs.TabIndex = 1;
-            // 
             // scrollBarZoom
             // 
             this.scrollBarZoom.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.scrollBarZoom.LargeChange = 1;
-            this.scrollBarZoom.Location = new System.Drawing.Point(730, 247);
+            this.scrollBarZoom.Location = new System.Drawing.Point(712, 277);
             this.scrollBarZoom.Maximum = 2;
             this.scrollBarZoom.Name = "scrollBarZoom";
             this.scrollBarZoom.Size = new System.Drawing.Size(87, 18);
@@ -605,6 +593,17 @@
             this.toolTip.SetToolTip(this.scrollBarZoom, "Adjust the zoom level of the graphs");
             this.scrollBarZoom.Value = 2;
             this.scrollBarZoom.ValueChanged += new System.EventHandler(this.scrollBarZoom_ValueChanged);
+            // 
+            // panelGraphs
+            // 
+            this.panelGraphs.AutoScroll = true;
+            this.panelGraphs.BackColor = System.Drawing.Color.Black;
+            this.panelGraphs.Controls.Add(this.graphsUserControl1);
+            this.panelGraphs.Location = new System.Drawing.Point(0, 30);
+            this.panelGraphs.Margin = new System.Windows.Forms.Padding(0);
+            this.panelGraphs.Name = "panelGraphs";
+            this.panelGraphs.Size = new System.Drawing.Size(817, 256);
+            this.panelGraphs.TabIndex = 1;
             // 
             // graphsUserControl1
             // 
@@ -616,7 +615,6 @@
             this.graphsUserControl1.Name = "graphsUserControl1";
             this.graphsUserControl1.Size = new System.Drawing.Size(815, 186);
             this.graphsUserControl1.TabIndex = 0;
-            this.graphsUserControl1.ZoomLevel = 2;
             this.graphsUserControl1.SelectedFieldChanged += new ComskipToCuttermaran.GraphsUserControl.SelectedFieldChangedCallback(this.timelineUserControl1_SelectedFieldChanged);
             // 
             // timelineUserControl1

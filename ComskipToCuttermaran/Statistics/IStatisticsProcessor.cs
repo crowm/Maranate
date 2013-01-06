@@ -21,6 +21,7 @@ namespace ComskipToCuttermaran.Statistics
 
     public class Data_info
     {
+        public Dictionary<string, int> ColumnIds = new Dictionary<string, int>();
         public List<Field> Fields = new List<Field>();
         public List<BlackFieldGroup> BlackFieldGroups = new List<BlackFieldGroup>();
         public List<Block> Blocks = new List<Block>();
@@ -43,14 +44,18 @@ namespace ComskipToCuttermaran.Statistics
 
     public class Field
     {
-        private static Dictionary<string, int> _columnIds = new Dictionary<string, int>();
-
+        private Dictionary<string, int> _columnIds = null;
         private Dictionary<int, double> _values = new Dictionary<int, double>();
 
         public int FieldNumber = -1;
         public double PTS = -1.0;
         public string State;
         public bool Invalid = false;
+
+        public Field(Data_info container)
+        {
+            _columnIds = container.ColumnIds;
+        }
 
         public void SetValue(string columnId, double value)
         {
@@ -82,9 +87,9 @@ namespace ComskipToCuttermaran.Statistics
             return value;
         }
 
-        public Field Clone()
+        public Field Clone(Data_info container)
         {
-            var f = new Field();
+            var f = new Field(container);
             foreach (var key in _values.Keys)
             {
                 f._values[key] = _values[key];

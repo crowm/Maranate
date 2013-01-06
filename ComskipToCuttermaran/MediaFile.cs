@@ -472,8 +472,12 @@ namespace ComskipToCuttermaran
             }
 
             long seekPTS = pts;
-            seekPTS = seekPTS / PTSPerField / _videoCodecContext.ticks_per_frame * _videoCodecContext.ticks_per_frame * PTSPerField;
-            seekPTS += _videoFrameFirstDTS.Value;
+            if (seekPTS < long.MaxValue)
+            {
+                seekPTS = seekPTS / PTSPerField / _videoCodecContext.ticks_per_frame * _videoCodecContext.ticks_per_frame * PTSPerField;
+                if (long.MaxValue - seekPTS > _videoFrameFirstDTS.Value)
+                    seekPTS += _videoFrameFirstDTS.Value;
+            }
 
             var originalPendingFrame = _pendingFrame;
             long lastSeekFilePosition = -1L;

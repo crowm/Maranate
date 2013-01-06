@@ -33,6 +33,7 @@ namespace ComskipToCuttermaran
             InitializeComponent();
 
             tabControl.Dock = DockStyle.Fill;
+            panelGraphs.Dock = DockStyle.Fill;
 
             objectListViewBlocks.RowFormatter = delegate(BrightIdeasSoftware.OLVListItem item)
             {
@@ -258,7 +259,7 @@ namespace ComskipToCuttermaran
                 {
                     var yFloatData = field.YData.GetFloatData();
                     var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yFloatData);
-                    var edgeImage = edgeData.GetBitmap();
+                    var edgeImage = edgeData.ToBitmap();
 
                     pictureBoxPreview.Image = edgeImage;
                 }
@@ -538,6 +539,14 @@ namespace ComskipToCuttermaran
             }
             if (e.KeyCode == Keys.Add)
             {
+                scrollBarZoom.Value = Math.Min(scrollBarZoom.Value + 1, scrollBarZoom.Maximum);
+            }
+            if (e.KeyCode == Keys.Subtract)
+            {
+                scrollBarZoom.Value = Math.Max(scrollBarZoom.Value - 1, scrollBarZoom.Minimum);
+            }
+            if (e.KeyCode == Keys.Insert)
+            {
                 InsertCutPoint();
                 e.Handled = true;
             }
@@ -596,6 +605,9 @@ namespace ComskipToCuttermaran
 
         private void timelineUserControl1_SelectedFieldChanged(int fieldNumber)
         {
+            if (scrollBarZoom.Value < 2)
+                fieldNumber -= (fieldNumber % _videoFile.FieldsPerSecond);
+
             SeekToField(fieldNumber);
             foreach (var block in _csvProcessor.Data.Blocks)
             {
@@ -751,13 +763,13 @@ namespace ComskipToCuttermaran
             }
             else
             {
-                _seekTimes = new double[] { 60, 300, 900 };
-                buttonSeekBackLarge.ButtonText = "-15m";
-                buttonSeekForwardLarge.ButtonText = "+15m";
-                buttonSeekBackMedium.ButtonText = "-5m";
-                buttonSeekForwardMedium.ButtonText = "+5m";
-                buttonSeekBackSmall.ButtonText = "-1m";
-                buttonSeekForwardSmall.ButtonText = "+1m";
+                _seekTimes = new double[] { 1, 60, 600 };
+                buttonSeekBackLarge.ButtonText = "-10m";
+                buttonSeekForwardLarge.ButtonText = "+10m";
+                buttonSeekBackMedium.ButtonText = "-1m";
+                buttonSeekForwardMedium.ButtonText = "+1m";
+                buttonSeekBackSmall.ButtonText = "-1s";
+                buttonSeekForwardSmall.ButtonText = "+1s";
             }
         }
 

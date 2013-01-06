@@ -9,6 +9,7 @@ namespace ComskipToCuttermaran.Statistics
     {
         public int LogoDetectSearch_StartPosition_Percentage = 10;
         public int LogoDetectSearch_EndPosition_Percentage = 90;
+        public int LogoDetectSearch_EdgeOfFramePadding = 5;
 
         public int BrightnessThreshold = -1;
         public double DetectBrightnessSafetyBufferPercent = 0.2;

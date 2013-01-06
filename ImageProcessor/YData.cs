@@ -40,7 +40,7 @@ namespace ImageProcessing
                         unsafe
                         {
                             //for (int y = 0; y < Height; y++)
-                            Parallel.For(0, height - 1, (y) =>
+                            Parallel.For(0, height, (y) =>
                             {
                                 fixed (byte* pData = Data)
                                 {
@@ -97,7 +97,7 @@ namespace ImageProcessing
 
             unsafe
             {
-                Parallel.For(0, Height - 1, (y) =>
+                Parallel.For(0, Height, (y) =>
                 {
                     fixed (byte* pData = Data)
                     {

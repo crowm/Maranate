@@ -23,7 +23,44 @@ namespace ImageProcessing
         public float[,] Data { get; private set; }
         public float MaximumValue { get; private set; }
 
-        public Bitmap GetBitmap()
+        public static YDataFloat FromBitmap(Bitmap image)
+        {
+            int width = image.Width;
+            int height = image.Height;
+            var data = new float[width, height];
+
+            var imageData = image.LockBits(new System.Drawing.Rectangle(0, 0, width, height), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+
+            unsafe
+            {
+                Parallel.For(0, height, (y) =>
+                {
+                    fixed (float* pData = data)
+                    {
+                        int* row = (int*)imageData.Scan0 + (y * imageData.Stride / sizeof(int));
+
+                        int yDstOffset = y;
+                        int xMax = width;
+
+                        int x = 0;
+                        while (x < xMax)
+                        {
+                            int value = row[x++];
+
+                            var color = Color.FromArgb(value);
+                            pData[yDstOffset] = color.GetBrightness() * 255.0f;
+                            yDstOffset += height;
+                        }
+                    }
+                });
+            }
+
+            image.UnlockBits(imageData);
+
+            return new YDataFloat(data, 255.0f);
+        }
+
+        public Bitmap ToBitmap()
         {
             long alpha1 = 255L << 24;
             long alpha2 = 255L << 56;
@@ -33,7 +70,7 @@ namespace ImageProcessing
 
             unsafe
             {
-                Parallel.For(0, Height - 1, (y) =>
+                Parallel.For(0, Height, (y) =>
                 {
                     fixed (float* pData = Data)
                     {

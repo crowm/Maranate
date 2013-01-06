@@ -329,19 +329,22 @@ namespace ComskipToCuttermaran
                 DrawFrames(g, ref yOffset);
                 DrawSplitter(g, ref yOffset);
 
-                // Draw current marker
-                var markerColor = Color.FromArgb(80, 80, 80);
-                using (var brush = new HatchBrush(HatchStyle.LightDownwardDiagonal, markerColor))
+                if ((VideoMediaFile != null) && (StatisticsProcessor != null))
                 {
-                    var x = (this.ClientSize.Width + 1) / 2.0f;
-                    var rect = Rectangle.FromLTRB((int)x, (int)yOffset, (int)(x + _field_dx), this.ClientSize.Height);
-                    g.FillRectangle(brush, rect);
-                    using (var pen = new Pen(markerColor))
+                    // Draw current marker
+                    var markerColor = Color.FromArgb(160, 160, 160);
+                    using (var brush = new HatchBrush(HatchStyle.LightDownwardDiagonal, markerColor))
                     {
-                        g.DrawRectangle(pen, rect);
+                        var x = (this.ClientSize.Width + 1) / 2.0f;
+                        var width = (_field_dx >= 1.0f) ? _field_dx : 1.0f;
+                        var rect = Rectangle.FromLTRB((int)x, (int)yOffset, (int)(x + width), this.ClientSize.Height);
+                        g.FillRectangle(brush, rect);
+                        using (var pen = new Pen(markerColor))
+                        {
+                            g.DrawRectangle(pen, rect);
+                        }
                     }
                 }
-
 
                 // Draw Statistics
                 DrawStatistics(g, ref yOffset);
@@ -566,33 +569,33 @@ namespace ComskipToCuttermaran
 
             DrawSplitter(g, ref yOffset);
 
-            if (StatisticsProcessor != null)
-            {
-                graphInfo = new GraphInfo(
-                    "Comskip Brightness",
-                    StatisticsProcessor.Data.WholeFileAverages.AverageBrightness,
-                    "csv_Brightness",
-                    StatisticsProcessor.Data.WholeFileAverages.AverageBrightness * 2,
-                    StatisticsProcessor.Data.BrightnessThreshold,
-                    Pens.Red);
-            }
-            DrawGraph(g, ref yOffset, graphInfo);
+            //if (StatisticsProcessor != null)
+            //{
+            //    graphInfo = new GraphInfo(
+            //        "Comskip Brightness",
+            //        StatisticsProcessor.Data.WholeFileAverages.AverageBrightness,
+            //        "csv_Brightness",
+            //        StatisticsProcessor.Data.WholeFileAverages.AverageBrightness * 2,
+            //        StatisticsProcessor.Data.BrightnessThreshold,
+            //        Pens.Red);
+            //}
+            //DrawGraph(g, ref yOffset, graphInfo);
 
-            DrawSplitter(g, ref yOffset);
+            //DrawSplitter(g, ref yOffset);
 
-            if (StatisticsProcessor != null)
-            {
-                graphInfo = new GraphInfo(
-                    "Comskip Uniform",
-                    StatisticsProcessor.Data.WholeFileAverages.AverageUniform,
-                    "csv_Uniform",
-                    StatisticsProcessor.Data.WholeFileAverages.AverageUniform * 2,
-                    StatisticsProcessor.Data.UniformThreshold,
-                    Pens.Purple);
-            }
-            DrawGraph(g, ref yOffset, graphInfo);
+            //if (StatisticsProcessor != null)
+            //{
+            //    graphInfo = new GraphInfo(
+            //        "Comskip Uniform",
+            //        StatisticsProcessor.Data.WholeFileAverages.AverageUniform,
+            //        "csv_Uniform",
+            //        StatisticsProcessor.Data.WholeFileAverages.AverageUniform * 2,
+            //        StatisticsProcessor.Data.UniformThreshold,
+            //        Pens.Purple);
+            //}
+            //DrawGraph(g, ref yOffset, graphInfo);
 
-            DrawSplitter(g, ref yOffset);
+            //DrawSplitter(g, ref yOffset);
 
             if (StatisticsProcessor != null)
             {
@@ -606,7 +609,6 @@ namespace ComskipToCuttermaran
             }
             DrawGraph(g, ref yOffset, graphInfo);
 
-            
 
             DrawSplitter(g, ref yOffset);
 
@@ -616,7 +618,7 @@ namespace ComskipToCuttermaran
                     "Logo Difference",
                     0.0,
                     "Logo_Difference",
-                    StatisticsProcessor.Data.WholeFileAverages.AverageBrightness * 2,
+                    0.3f,
                     0.0,
                     Pens.Yellow);
             }
@@ -743,8 +745,9 @@ namespace ComskipToCuttermaran
                     var fieldIndexStart = seconds * VideoMediaFile.FieldsPerSecond;
                     var fieldIndexEnd = fieldIndexStart + VideoMediaFile.FieldsPerSecond;
 
-                    double averageTotal = 0.0;
-                    int averageCount = 0;
+                    var average = new StatisticsProcessor.AverageDouble();
+                    average.RecordMaximum = true;
+                    average.RecordMinimum = true;
 
                     for (int fieldIndex = fieldIndexStart; fieldIndex < fieldIndexEnd; fieldIndex++)
                     {
@@ -755,31 +758,51 @@ namespace ComskipToCuttermaran
                         if (frame != null)
                         {
                             var value = frame.GetValue(columnId);
-                            if (value.HasValue)
-                            {
-                                averageTotal += value.Value;
-                                averageCount++;
-                            }
+                            average.Add(value);
                         }
                     }
 
-                    if (averageCount > 0)
+                    if (average.Count > 0)
                     {
-                        var value = averageTotal / (float)averageCount;
-                        var y = yOffset + (float)((maxValue - value) / (maxValue / (float)graphHeight));
-                        if (value <= threshold)
+                        var yAvg = yOffset + (float)((maxValue - average.Average) / (maxValue / (float)graphHeight));
+                        var yMax = yOffset + (float)((maxValue - average.Maximum) / (maxValue / (float)graphHeight));
+                        var yMin = yOffset + (float)((maxValue - average.Minimum) / (maxValue / (float)graphHeight));
+
+                        if (yAvg < yOffset)
+                            yAvg = yOffset;
+                        if (yMax < yOffset)
+                            yMax = yOffset;
+                        if (yMin < yOffset)
+                            yMin = yOffset;
+
+                        var color = (int)(graphPen.Color.GetBrightness() * 192);
+                        using (var rangePen = new Pen(Color.FromArgb(color, color, color)))
                         {
-                            g.DrawLine(Pens.Wheat, x, y, x + _field_dx, y);
+                            // Draw Min to Avg
+                            var pen = rangePen;
+                            if (yMin > yOffset)
+                            {
+                                if (average.Minimum <= threshold)
+                                    pen = Pens.Wheat;
+                                g.DrawLine(pen, x, yAvg, x, yMin + 1);
+                            }
+
+                            // Draw Avg to Max
+                            pen = rangePen;
+                            if (yAvg > yOffset)
+                            {
+                                g.DrawLine(pen, x, yMax, x, yAvg + 1);
+                            }
+
+                            // Draw Avg point
+                            pen = graphPen;
+                            if ((average.Average <= threshold) || (yAvg == yOffset))
+                            {
+                                pen = Pens.Wheat;
+                            }
+                            g.DrawLine(pen, x, yAvg, x, yAvg + 1);
                         }
-                        else if (y < yOffset)
-                        {
-                            y = yOffset;
-                            g.DrawLine(Pens.Wheat, x, y, x + _field_dx, y);
-                        }
-                        else
-                        {
-                            g.DrawLine(graphPen, x, y, x + _field_dx, y);
-                        }
+
                     }
                 }                
             }

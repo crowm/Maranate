@@ -69,7 +69,7 @@ namespace ComskipToCuttermaran.Statistics
         public int Process()
         {
             int result = 0;
-            Log("Processing Comskip csv file.");
+            Log("Processing...");
 
             result = Load();
             if (result < 0)
@@ -177,94 +177,125 @@ namespace ComskipToCuttermaran.Statistics
                 _videoFile.OutputYData = true;
                 _videoFile.Open(_filenames.videoFilename);
 
-                var fieldsPerSecond = _videoFile.FieldsPerSecond;
+                var fieldsBetweenAveragedLogoFrames = _videoFile.FieldsPerSecond;
 
                 // Fill with maps of 127s
-                const int EDGE_MAP_AVERAGE_COUNT = 100;
+                const int EDGE_MAP_AVERAGE_COUNT = 29;// 100;
                 var edgeMapList = new LinkedList<ImageProcessing.YDataFloat>();
 
                 var stopwatch = new System.Diagnostics.Stopwatch();
                 stopwatch.Start();
+                var stopwatchRestartedForLogoZone = false;
 
                 Task taskLogoDetect = null;
 
+                int fieldNumberFPS = 0;
                 int fieldNumber = 0;
-                int fieldNumberEdgeMapAvg = EDGE_MAP_AVERAGE_COUNT / -2;
+                int fieldNumberEdgeMapAvg = (EDGE_MAP_AVERAGE_COUNT - 1) * fieldsBetweenAveragedLogoFrames / -2;
                 int lastPrintSeconds = 0;
 
                 //return 0;
 
+                // --------------- Start logo detection ---------------
                 // Get Logo detection base frame
                 ImageProcessing.YDataFloat logoDetectionFrame;
+                float logoDetectionFrameAverage;
+                float logoDetectionFrameMaximum;
                 {
-                    // Skip the first 5% and last 15% of the recording
-
-                    var firstFrame = (int)(_videoFile.TotalFields * Settings.LogoDetectSearch_StartPosition_Percentage / 100);
-                    firstFrame -= (firstFrame % _videoFile.FieldsPerFrame);
-                    var lastFrame = (int)(_videoFile.TotalFields * Settings.LogoDetectSearch_EndPosition_Percentage / 100);
-                    lastFrame -= (firstFrame % _videoFile.FieldsPerFrame);
-
-                    const int LOGO_DETECTION_FRAMES_TO_AVERAGE = 250;
-                    var frameInterval = (lastFrame - firstFrame) / LOGO_DETECTION_FRAMES_TO_AVERAGE;
-                    frameInterval -= (frameInterval % _videoFile.FieldsPerFrame);
-                    if (frameInterval < 2)
-                        frameInterval = 2;
-                    
-                    for (fieldNumber = firstFrame; fieldNumber < lastFrame; fieldNumber += frameInterval)
+                    if (System.IO.File.Exists(_filenames.logoFilename))
                     {
-                        var frameField = _videoFile.GetVideoFrameField(fieldNumber, MediaFile.SeekModes.Accurate);
-                        var yData = frameField.YData;
+                        Console.WriteLine("Loading logo from file: " + System.IO.Path.GetFileName(_filenames.logoFilename));
+                        var image = new System.Drawing.Bitmap(_filenames.logoFilename);
+                        logoDetectionFrame = ImageProcessing.YDataFloat.FromBitmap(image);
+                    }
+                    else
+                    {
+                        // Skip the first 5% and last 15% of the recording
 
+                        var firstFrame = (int)(_videoFile.TotalFields * Settings.LogoDetectSearch_StartPosition_Percentage / 100);
+                        firstFrame -= (firstFrame % _videoFile.FieldsPerFrame);
+                        var lastFrame = (int)(_videoFile.TotalFields * Settings.LogoDetectSearch_EndPosition_Percentage / 100);
+                        lastFrame -= (firstFrame % _videoFile.FieldsPerFrame);
+
+                        const int LOGO_DETECTION_FRAMES_TO_AVERAGE = 250;
+                        var frameInterval = (lastFrame - firstFrame) / LOGO_DETECTION_FRAMES_TO_AVERAGE;
+                        frameInterval -= (frameInterval % _videoFile.FieldsPerFrame);
+                        if (frameInterval < 2)
+                            frameInterval = 2;
+
+                        for (fieldNumber = firstFrame; fieldNumber < lastFrame; fieldNumber += frameInterval)
+                        {
+                            var frameField = _videoFile.GetVideoFrameField(fieldNumber, MediaFile.SeekModes.Accurate);
+                            var yData = frameField.YData;
+
+                            if (taskLogoDetect != null)
+                                taskLogoDetect.Wait();
+
+                            taskLogoDetect = Task.Factory.StartNew(() =>
+                                {
+                                    var yDataFloat = yData.GetFloatData();
+                                    //yDataFloat.GetBitmap().Save(@"D:\temp\image-" + fieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                                    var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yDataFloat);
+                                    edgeMapList.AddLast(edgeData);
+                                    //edgeData.GetBitmap().Save(@"D:\temp\edgeData-" + fieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                                });
+
+                            long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                            int elapsedSeconds = (int)(elapsedMilliseconds / 1000);
+                            if (elapsedSeconds != lastPrintSeconds)
+                            {
+                                lastPrintSeconds = elapsedSeconds;
+                                Console.WriteLine("Searching for logo: " + (100.0f * (fieldNumber - firstFrame) / (lastFrame - firstFrame)).ToString("00") + "%");
+                            }
+                        }
                         if (taskLogoDetect != null)
                             taskLogoDetect.Wait();
 
-                        taskLogoDetect = Task.Factory.StartNew(() =>
-                            {
-                                var yDataFloat = yData.GetFloatData();
-                                var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yDataFloat);
-                                edgeMapList.AddLast(edgeData);
-                                //edgeData.GetBitmap().Save(@"D:\temp\edgeData-" + fieldNumber.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
-                            });
-
-                        //long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
-                        //int elapsedSeconds = (int)(elapsedMilliseconds / 1000);
-                        //if (elapsedSeconds != lastPrintSeconds)
-                        //{
-                        //    lastPrintSeconds = elapsedSeconds;
-                        //    var fps = (fieldNumber / frameInterval) * 1000.0f / (float)elapsedMilliseconds;
-                        //    Console.WriteLine("Frame: " + fieldNumber.ToString() + "  FPS: " + fps.ToString("0.00"));
-                        //}
+                        logoDetectionFrame = ImageProcessing.ImageProcessor.GenerateEdgeDetectionAverage(edgeMapList, Settings.LogoDetectSearch_EdgeOfFramePadding);
+                        logoDetectionFrame.ToBitmap().Save(_filenames.logoFilename, System.Drawing.Imaging.ImageFormat.Png);
                     }
-                    if (taskLogoDetect != null)
-                        taskLogoDetect.Wait();
 
-                    logoDetectionFrame = ImageProcessing.ImageProcessor.GenerateEdgeDetectionAverage(edgeMapList);
-                    //logoDetectionFrame.GetBitmap().Save(@"D:\temp\logoFrame.png", System.Drawing.Imaging.ImageFormat.Png);
+                    ImageProcessing.ImageProcessor.CalculateAverageAndMaximumCPU(logoDetectionFrame, out logoDetectionFrameAverage, out logoDetectionFrameMaximum);
+
+                    if (logoDetectionFrameMaximum - logoDetectionFrameAverage < 5)
+                    {
+                        Console.WriteLine("No logo detected. Disabling logo processing.");
+                        logoDetectionFrame = null;
+                    }
+
+                    edgeMapList.Clear();
 
                     Console.WriteLine("Logo Detection time taken: " + stopwatch.Elapsed.ToString());
                 }
-
+                // --------------- End logo detection ---------------
 
                 stopwatch.Restart();
                 fieldNumber = 0;
+                fieldNumberFPS = 0;
                 var emptyEdgeMap = ImageProcessing.YDataFloat.NewData(_videoFile.Width, _videoFile.Height / _videoFile.FieldsPerFrame, (float)byte.MaxValue, byte.MaxValue / 2.0f);
-                edgeMapList.Clear();
+                var edgeMapAverage = ImageProcessing.YDataFloat.NewData(_videoFile.Width, _videoFile.Height / _videoFile.FieldsPerFrame, (float)byte.MaxValue, byte.MaxValue / 2.0f);
+
                 while (edgeMapList.Count < EDGE_MAP_AVERAGE_COUNT)
                     edgeMapList.AddLast(emptyEdgeMap);
 
-                //while (fieldNumberEdgeMapAvg < _videoFile.TotalFields)
-                while (fieldNumberEdgeMapAvg < 10000)
+                var startAt = 0;
+                fieldNumber += startAt;
+                fieldNumberEdgeMapAvg += startAt;
+
+                while (fieldNumberEdgeMapAvg < _videoFile.TotalFields)
+                //while ((fieldNumberEdgeMapAvg < _videoFile.TotalFields) && (fieldNumber < 500))
                 {
+                    MediaFile.FrameField frameField = null;
+
                     if (fieldNumber < _videoFile.TotalFields)
                     {
-                        var frameField = _videoFile.GetVideoFrameField(fieldNumber);
+                        frameField = _videoFile.GetVideoFrameField(fieldNumber);
                         var yData = frameField.YData;
-                        //yData.GetBitmap().Save(@"D:\temp\yData.png", System.Drawing.Imaging.ImageFormat.Png);
 
                         Field f = null;
                         while (Data.Fields.Count < fieldNumber)
                         {
-                            f = new Field();
+                            f = new Field(Data);
                             f.Invalid = true;
                             Data.Fields.Add(f);
                         }
@@ -274,7 +305,7 @@ namespace ComskipToCuttermaran.Statistics
                         }
                         else
                         {
-                            f = new Field();
+                            f = new Field(Data);
                             f.PTS = frameField.PTS;
                             Data.Fields.Add(f);
                         }
@@ -292,63 +323,68 @@ namespace ComskipToCuttermaran.Statistics
                         float stdDev = 0.0f;
                         ImageProcessing.ImageProcessor.CalculateStandardDeviationCPU(yData, average, out stdDev);
                         f.SetValue("Brightness_StdDev", stdDev);
+                    }
 
+                    // --------------
+                    // Edge detection
+                    if ((logoDetectionFrame != null) && ((fieldNumber % fieldsBetweenAveragedLogoFrames) == 0))
+                    {
+                        if (taskLogoDetect != null)
+                            taskLogoDetect.Wait();
 
-                        // --------------
-                        // Edge detection
-                        if ((fieldNumber % fieldsPerSecond) == 0)
+                        var frameFieldCopy = frameField;
+                        var fieldNumberCopy = fieldNumber;
+                        var fieldNumberEdgeMapAvgCopy = fieldNumberEdgeMapAvg;
+
+                        taskLogoDetect = Task.Factory.StartNew(() =>
                         {
-                            var yDataFloat = yData.GetFloatData();
-                            //yDataFloat.GetBitmap().Save(@"D:\temp\yDataFloat.png", System.Drawing.Imaging.ImageFormat.Png);
+                            var edgeDataNew = emptyEdgeMap;
+                            var edgeDataOld = edgeMapList.First.Value;
 
-                            var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yDataFloat);
-                            //var edgeData = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImageAccel(ImageProcessing.ImageProcessor.AcceleratorTarget.DX9, yDataFloat);
+                            if (frameFieldCopy != null)
+                            {
+                                var yDataFloat = frameFieldCopy.YData.GetFloatData();
 
-                            //edgeData.GetBitmap().Save(@"D:\temp\imageParallel.png", System.Drawing.Imaging.ImageFormat.Png);
+                                //edgeDataNew = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImage(yDataFloat);
+                                edgeDataNew = ImageProcessing.ImageProcessor.GenerateEdgeDetectedImageAccel(ImageProcessing.ImageProcessor.AcceleratorTarget.DX9, yDataFloat);
 
-                            edgeMapList.AddLast(edgeData);
-                            while (edgeMapList.Count > EDGE_MAP_AVERAGE_COUNT)
-                                edgeMapList.RemoveFirst();
-                        }
+                                //edgeDataNew.GetBitmap().Save(@"D:\temp\edgeMap-" + fieldNumberCopy.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
 
-                        frameField.Dispose();
+                                frameFieldCopy.Dispose();
+                            }
+
+                            edgeMapList.RemoveFirst();
+                            edgeMapList.AddLast(edgeDataNew);
+
+                            ImageProcessing.ImageProcessor.AdvanceEdgeDetectionAverage(ref edgeMapAverage, edgeDataNew, edgeDataOld, EDGE_MAP_AVERAGE_COUNT);
+
+                            if (fieldNumberEdgeMapAvgCopy == 0)
+                                Console.WriteLine("Starting logo testing.");
+
+                            if (fieldNumberEdgeMapAvgCopy >= 0)
+                            {
+                                //edgeMapAverage.GetBitmap().Save(@"D:\temp\edgeAvg-" + fieldNumberEdgeMapAvgCopy.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+
+                                var f = Data.Fields[fieldNumberEdgeMapAvgCopy];
+
+                                float logoDifference;
+
+                                ImageProcessing.ImageProcessor.CalculateLogoDifference(edgeMapAverage, logoDetectionFrame, logoDetectionFrameAverage, logoDetectionFrameMaximum, out logoDifference);
+                                f.SetValue("Logo_Difference", logoDifference);
+
+                                //var diffMap = ImageProcessing.ImageProcessor.GenerateLogoDifferenceMap(edgeMapAverage, logoDetectionFrame, logoDetectionFrameAverage, logoDetectionFrameMaximum);
+                                //diffMap.GetBitmap().Save(@"D:\temp\diffMap2-" + fieldNumberEdgeMapAvgCopy.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                            }
+                        });
                     }
                     else
                     {
-                        if ((fieldNumber % fieldsPerSecond) == 0)
-                        {
-                            edgeMapList.AddLast(emptyEdgeMap);
-                            while (edgeMapList.Count > EDGE_MAP_AVERAGE_COUNT)
-                                edgeMapList.RemoveFirst();
-                        }
+                        if (frameField != null)
+                            frameField.Dispose();
                     }
 
-                    if ((fieldNumberEdgeMapAvg >= 0) && (fieldNumberEdgeMapAvg < _videoFile.TotalFields))
-                    {
-                        if ((fieldNumberEdgeMapAvg % fieldsPerSecond) == 0)
-                        {
-                            if (taskLogoDetect != null)
-                                taskLogoDetect.Wait();
 
-                            //Console.Write("<");
-                            var edgeMapListCopy = edgeMapList.ToList();
-                            var fieldNumberEdgeMapAvgCopy = fieldNumberEdgeMapAvg;
-                            taskLogoDetect = Task.Factory.StartNew(() =>
-                                {
-                                    var f = Data.Fields[fieldNumberEdgeMapAvgCopy];
-
-                                    var edgeMapAvg = ImageProcessing.ImageProcessor.GenerateEdgeDetectionAverage(edgeMapListCopy);
-                                    //var edgeMapAvg = ImageProcessing.ImageProcessor.GenerateEdgeDetectionAverageAccel(ImageProcessing.ImageProcessor.AcceleratorTarget.Multicore, edgeMapList);
-                                    //var edgeMapAvg = ImageProcessing.ImageProcessor.GenerateEdgeDetectionAverageAccel(ImageProcessing.ImageProcessor.AcceleratorTarget.DX9, edgeMapList);
-                                    //edgeMapAvg.GetBitmap().Save(@"D:\temp\edgeAvg-" + fieldNumberEdgeMapAvgCopy.ToString("00000") + ".png", System.Drawing.Imaging.ImageFormat.Png);
-
-                                    float logoDifference;
-                                    ImageProcessing.ImageProcessor.CalculateLogoDifference(edgeMapAvg, logoDetectionFrame, out logoDifference);
-                                    f.SetValue("Logo_Difference", logoDifference);
-                                });
-                        }
-                    }
-
+                    fieldNumberFPS++;
                     fieldNumber++;
                     fieldNumberEdgeMapAvg++;
 
@@ -357,7 +393,16 @@ namespace ComskipToCuttermaran.Statistics
                     if (elapsedSeconds != lastPrintSeconds)
                     {
                         lastPrintSeconds = elapsedSeconds;
-                        var fps = fieldNumber * 1000.0f / (float)elapsedMilliseconds;
+                        var fps = fieldNumberFPS * 1000.0f / (float)elapsedMilliseconds;
+                        if (fieldNumberEdgeMapAvg > 0)
+                        {
+                            if (!stopwatchRestartedForLogoZone)
+                            {
+                                stopwatchRestartedForLogoZone = true;
+                                stopwatch.Restart();
+                                fieldNumberFPS = 0;
+                            }
+                        }
                         Console.WriteLine("Frame: " + fieldNumber.ToString() + "  FPS: " + fps.ToString("0.00"));
                     }
                 }
@@ -403,7 +448,7 @@ namespace ComskipToCuttermaran.Statistics
                     {
                         parts = line.Split(',');
 
-                        var f = new Field();
+                        var f = new Field(Data);
                         foreach (CsvColumnId id in Enum.GetValues(typeof(CsvColumnId)))
                         {
                             var part = parts[_columnIds[id]];
@@ -428,7 +473,7 @@ namespace ComskipToCuttermaran.Statistics
                         Data.Fields.Add(f);
 
                         // Add a copy since the file contains frames, not fields
-                        f = f.Clone();
+                        f = f.Clone(Data);
                         f.FieldNumber += 1;
 
                         Data.Fields.Add(f);
@@ -442,7 +487,7 @@ namespace ComskipToCuttermaran.Statistics
         {
             if (Settings.BrightnessThreshold <= 0)
             {
-                Data.BrightnessThreshold = DetectThreshold("csv_Brightness", out Data.BrightnessThresholdHistogram);
+                Data.BrightnessThreshold = DetectThreshold("Brightness_Avg", out Data.BrightnessThresholdHistogram);
                 Data.BrightnessThresholdPreSafety = Data.BrightnessThreshold;
                 Data.BrightnessThreshold = (int)(Data.BrightnessThreshold * (1.0 + Settings.DetectBrightnessSafetyBufferPercent));
                 Data.BrightnessThreshold += Settings.DetectBrightnessSafetyBufferOffset;
@@ -456,7 +501,7 @@ namespace ComskipToCuttermaran.Statistics
 
             if (Settings.UniformThreshold <= 0)
             {
-                Data.UniformThreshold = DetectThreshold("csv_Uniform", out Data.UniformThresholdHistogram);
+                Data.UniformThreshold = DetectThreshold("Brightness_StdDev", out Data.UniformThresholdHistogram);
                 Data.UniformThresholdPreSafety = Data.UniformThreshold;
                 Data.UniformThreshold = (int)(Data.UniformThreshold * (1.0 + Settings.DetectUniformSafetyBufferPercent));
                 Data.UniformThreshold += Settings.DetectUniformSafetyBufferOffset;
@@ -508,8 +553,8 @@ namespace ComskipToCuttermaran.Statistics
                     if (field.Invalid)
                         continue;
 
-                    double? brightness = field.GetValue("csv_Brightness");
-                    double? uniform = field.GetValue("csv_Uniform");
+                    double? brightness = field.GetValue("Brightness_Avg");
+                    double? uniform = field.GetValue("Brightness_StdDev");
                     double? sound = field.GetValue("csv_Sound");
 
                     if (!brightness.HasValue || !uniform.HasValue || !sound.HasValue)
@@ -538,7 +583,7 @@ namespace ComskipToCuttermaran.Statistics
             {
                 int cutFieldIndex = -1;
                 double minBrightness = (from f in blackFieldGroup.Fields
-                                        let bright = f.GetValue("csv_Brightness")
+                                        let bright = f.GetValue("Brightness_Avg")
                                         where bright.HasValue
                                         select bright.Value).Min();
                 double minSound = int.MaxValue;
@@ -546,7 +591,7 @@ namespace ComskipToCuttermaran.Statistics
                 for (int fieldIndex = 0; fieldIndex < blackFieldGroup.Fields.Count; fieldIndex++)
                 {
                     var field = blackFieldGroup.Fields[fieldIndex];
-                    double brightness = field.GetValue("csv_Brightness").Value - minBrightness;
+                    double brightness = field.GetValue("Brightness_Avg").Value - minBrightness;
                     if (brightness == 0)
                     {
                         double sound = field.GetValue("csv_Sound").Value;
@@ -566,7 +611,7 @@ namespace ComskipToCuttermaran.Statistics
                 for (int fieldIndex = cutFieldIndex; fieldIndex >= 0; fieldIndex--)
                 {
                     var field = blackFieldGroup.Fields[fieldIndex];
-                    double brightness = field.GetValue("csv_Brightness").Value - minBrightness;
+                    double brightness = field.GetValue("Brightness_Avg").Value - minBrightness;
                     if (brightness == 0)
                     {
                         double sound = field.GetValue("csv_Sound").Value;
@@ -606,8 +651,8 @@ namespace ComskipToCuttermaran.Statistics
 
                 foreach (var field in blackFieldGroup.Fields)
                 {
-                    double brightness = field.GetValue("csv_Brightness").Value;
-                    double uniform = field.GetValue("csv_Uniform").Value;
+                    double brightness = field.GetValue("Brightness_Avg").Value;
+                    double uniform = field.GetValue("Brightness_StdDev").Value;
                     double sound = field.GetValue("csv_Sound").Value;
 
                     line = new StringBuilder();
@@ -856,38 +901,41 @@ namespace ComskipToCuttermaran.Statistics
             int endFieldIndex = Data.Fields.IndexOf(block.EndField);
             int fieldCount = endFieldIndex - startFieldIndex + 1;
 
-            double brightness = 0;
-            double scene_change = 0;
-            double logo = 0;
-            double uniform = 0;
-            double sound = 0;
-            double logSound = 0;
+            var brightness = new AverageDouble();
+            var scene_change = new AverageDouble();
+            var logo = new AverageDouble();
+            var uniform = new AverageDouble();
+            var sound = new AverageDouble();
+            var logSound = new AverageDouble();
 
             for (int fieldIndex = startFieldIndex; fieldIndex <= endFieldIndex; fieldIndex++)
             {
                 var field = Data.Fields[fieldIndex];
 
-                brightness += field.GetValue("csv_Brightness").Value;
-                scene_change += field.GetValue("csv_Scene_Change").Value;
-                logo += field.GetValue("csv_Logo").Value;
-                uniform += field.GetValue("csv_Uniform").Value;
-                double fieldSound = field.GetValue("csv_Sound").Value;
-                sound += fieldSound;
-                double logSoundValue = 0.0;
-                if (fieldSound >= 1.0)
+                brightness.Add(field.GetValue("Brightness_Avg"));
+                scene_change.Add(field.GetValue("csv_Scene_Change"));
+                logo.Add(field.GetValue("csv_Logo"));
+                uniform.Add(field.GetValue("Brightness_StdDev"));
+                double? fieldSound = field.GetValue("csv_Sound");
+                if (fieldSound != null)
                 {
-                    logSoundValue = Math.Log(fieldSound, 2);
+                    sound.Add(fieldSound);
+                    double logSoundValue = 0.0;
+                    if (fieldSound.Value >= 1.0)
+                    {
+                        logSoundValue = Math.Log(fieldSound.Value, 2);
+                    }
+                    //double logSoundValue = field.Sound * field.Sound / 1000.0;
+                    logSound.Add(logSoundValue);
                 }
-                //double logSoundValue = field.Sound * field.Sound / 1000.0;
-                logSound += logSoundValue;
             }
 
-            block.AverageBrightness = brightness / (double)fieldCount;
-            block.AverageSceneChange = scene_change / (double)fieldCount;
-            block.AverageLogo = logo / (double)fieldCount;
-            block.AverageUniform = uniform / (double)fieldCount;
-            block.AverageSound = sound / (double)fieldCount;
-            block.AverageLogSound = logSound / (double)fieldCount;
+            block.AverageBrightness = brightness.Average;
+            block.AverageSceneChange = scene_change.Average;
+            block.AverageLogo = logo.Average;
+            block.AverageUniform = uniform.Average;
+            block.AverageSound = sound.Average;
+            block.AverageLogSound = logSound.Average;
 
             block.Length = block.EndField.PTS - block.StartField.PTS;
         }
@@ -906,6 +954,76 @@ namespace ComskipToCuttermaran.Statistics
             text.Append(block.AverageLogSound.ToString("0.00").PadLeft(8) + " ");
             text.Append(block.Length.ToString("0.00").PadLeft(8) + " ");
             Log(text.ToString());
+        }
+
+        public class AverageDouble
+        {
+            double _total = 0.0;
+            int _count = 0;
+            double? _maximum = null;
+            double? _minimum = null; 
+
+            public bool RecordMaximum { get; set; }
+            public bool RecordMinimum { get; set; }
+
+            public int Count
+            {
+                get { return _count; }
+            }
+
+            public double Average
+            {
+                get
+                {
+                    if (_count > 0)
+                        return _total / (double)_count;
+                    else
+                        return 0.0;
+                }
+            }
+
+            public double Maximum
+            {
+                get
+                {
+                    return (_maximum != null) ? _maximum.Value : 0.0;
+                }
+            }
+
+            public double Minimum
+            {
+                get
+                {
+                    return (_minimum != null) ? _minimum.Value : 0.0;
+                }
+            }
+
+            public AverageDouble()
+            {
+                RecordMaximum = false;
+                RecordMinimum = false;
+            }
+
+            public void Add(double? value)
+            {
+                if (value != null)
+                {
+                    _total += value.Value;
+                    _count++;
+
+                    if (RecordMaximum)
+                    {
+                        if ((_maximum == null) || (_maximum < value.Value))
+                            _maximum = value.Value;
+                    }
+                    if (RecordMinimum)
+                    {
+                        if ((_minimum == null) || (_minimum > value.Value))
+                            _minimum = value.Value;
+                    }
+                }
+            }
+
         }
 
     }

@@ -31,6 +31,9 @@ namespace ImageProcessing
         // This method that takes YData instead of YDataFloat is by far the fastest method.
         public static void CalculateAverageAndMaximumCPU(YData imageData, out float average, out float maximum)
         {
+            const float LOW_ACCURACY_THRESHOLD = 64.0f;
+            const int LOW_ACCURACY_DIVISOR = 8;
+
             int width = imageData.Width;
             int height = imageData.Height;
 
@@ -39,55 +42,77 @@ namespace ImageProcessing
             maximum = 0.0f;
 
             var averageSlices = new int[height];
+            var averageCounts = new int[height];
             var maximumSlices = new byte[height];
-            Parallel.For(0, height - 1, (y) =>
+
+            int loopCount = height / LOW_ACCURACY_DIVISOR;
+
+            Parallel.For(0, loopCount, (loop, state) =>
             {
-                unsafe
+                for (int y = loop * LOW_ACCURACY_DIVISOR; y < (loop + 1) * LOW_ACCURACY_DIVISOR && (y < height); y++)
                 {
-                    fixed (byte* pDataByte = imageData.Data)
+                    unsafe
                     {
-                        var pData = (int*)pDataByte; // Tried long* instead of int* and it made little difference
-
-                        int ySrcOffset = (y * imageData.Stride) / sizeof(int);
-                        int xMax = width / sizeof(int);
-
-                        int avg = 0;
-                        byte max = 0;
-                        for (int x = 0; x < xMax; x++)
+                        fixed (byte* pDataByte = imageData.Data)
                         {
-                            var color = pData[ySrcOffset++];
+                            var pData = (int*)pDataByte; // Tried long* instead of int* and it made little difference
 
-                            byte value;
+                            int ySrcOffset = (y * imageData.Stride) / sizeof(int);
+                            int xMax = width / sizeof(int);
 
-                            value = (byte)(color & 0xFF);
-                            avg += value;
-                            if (max < value)
-                                max = value;
+                            int avg = 0;
+                            int count = 0;
+                            byte max = 0;
+                            for (int x = 0; x < xMax; x++)
+                            {
+                                var color = pData[ySrcOffset++];
 
-                            value = (byte)((color >> 8) & 0xFF);
-                            avg += value;
-                            if (max < value)
-                                max = value;
+                                byte value;
 
-                            value = (byte)((color >> 16) & 0xFF);
-                            avg += value;
-                            if (max < value)
-                                max = value;
+                                value = (byte)(color & 0xFF);
+                                avg += value;
+                                if (max < value)
+                                    max = value;
 
-                            value = (byte)((color >> 24) & 0xFF);
-                            avg += value;
-                            if (max < value)
-                                max = value;
+                                value = (byte)((color >> 8) & 0xFF);
+                                avg += value;
+                                if (max < value)
+                                    max = value;
+
+                                value = (byte)((color >> 16) & 0xFF);
+                                avg += value;
+                                if (max < value)
+                                    max = value;
+
+                                value = (byte)((color >> 24) & 0xFF);
+                                avg += value;
+                                if (max < value)
+                                    max = value;
+
+                                count += 4;
+
+                                if (max > LOW_ACCURACY_THRESHOLD)
+                                {
+                                    x += 7;
+                                    ySrcOffset += 7;
+                                }
+                            }
+
+                            averageSlices[y] = avg;
+                            averageCounts[y] = count;
+                            maximumSlices[y] = max;
+
+                            if (max > LOW_ACCURACY_THRESHOLD)
+                                break;
+
                         }
-
-                        averageSlices[y] = avg;
-                        maximumSlices[y] = max;
                     }
                 }
             });
 
             average = averageSlices.AsParallel().Sum();
-            average /= (float)(width * height);
+            var totalCount = averageCounts.AsParallel().Sum();
+            average /= (float)totalCount;
 
             maximum = maximumSlices.AsParallel().Max();
         }
@@ -103,7 +128,7 @@ namespace ImageProcessing
 
             var averageSlices = new float[height];
             var maximumSlices = new float[height];
-            Parallel.For(0, height - 1, (y) =>
+            Parallel.For(0, height, (y) =>
             {
                 float avg = 0.0f;
                 float max = 0.0f;
@@ -152,6 +177,9 @@ namespace ImageProcessing
 
         public static void CalculateStandardDeviationCPU(YData imageData, float average, out float stdDev)
         {
+            const float LOW_ACCURACY_THRESHOLD = 48.0f;
+            const int LOW_ACCURACY_DIVISOR = 16;
+
             int width = imageData.Width;
             int height = imageData.Height;
 
@@ -159,10 +187,18 @@ namespace ImageProcessing
             stdDev = 0.0f;
 
             float[] totalSlices = new float[height];
+            int[] countSlices = new int[height];
+
+            int loopCount = height;
+            if (average > LOW_ACCURACY_THRESHOLD)
+                loopCount = height / LOW_ACCURACY_DIVISOR;
 
             //for (int y = 0; y < height; y++)
-            Parallel.For(0, height - 1, (y) =>
+            Parallel.For(0, loopCount, (y) =>
             {
+                if (average > LOW_ACCURACY_THRESHOLD)
+                    y *= LOW_ACCURACY_DIVISOR;
+
                 unsafe
                 {
                     fixed (byte* pDataByte = imageData.Data)
@@ -173,6 +209,7 @@ namespace ImageProcessing
                         int xMax = width / sizeof(int);
 
                         float total = 0.0f;
+                        int count = 0;
 
                         for (int x = 0; x < xMax; x++)
                         {
@@ -194,14 +231,24 @@ namespace ImageProcessing
                             value = (float)((color >> 24) & 0xFF);
                             value = (value - average) * (value - average);
                             total += value;
+
+                            count += 4;
+
+                            if (average > LOW_ACCURACY_THRESHOLD)
+                            {
+                                x += (LOW_ACCURACY_DIVISOR - 1);
+                                ySrcOffset += (LOW_ACCURACY_DIVISOR - 1);
+                            }
                         }
                         totalSlices[y] = total;
+                        countSlices[y] = count;
                     }
                 }
             });
 
             stdDev = totalSlices.AsParallel().Sum();
-            stdDev /= (float)(width * height);
+            var totalCount = countSlices.AsParallel().Sum();
+            stdDev /= (float)totalCount;
             stdDev = (float)Math.Sqrt(stdDev);
         }
 
@@ -214,7 +261,7 @@ namespace ImageProcessing
             stdDev = 0.0f;
 
             float[] totalSlices = new float[height];
-            Parallel.For(0, height - 1, (y) =>
+            Parallel.For(0, height, (y) =>
             {
                 unsafe
                 {
@@ -286,7 +333,7 @@ namespace ImageProcessing
 
             var edgeData = new float[width, height];
 
-            Parallel.For(0, height - 1, (y) =>
+            Parallel.For(0, height, (y) =>
             {
                 for (int x = 0; x < width; x++)
                 {
@@ -302,7 +349,7 @@ namespace ImageProcessing
                     }
                     else
                     {
-                        edgeData[x, y] = 0.0f;
+                        edgeData[x, y] = 127.5f; // byte.MaxValue / 2.0f;
                     }
                 }
             });
@@ -339,7 +386,7 @@ namespace ImageProcessing
 
         // -------------- Average of Edges --------------
 
-        public static YDataFloat GenerateEdgeDetectionAverage(IEnumerable<YDataFloat> edgeMapList)
+        public static YDataFloat GenerateEdgeDetectionAverage(IEnumerable<YDataFloat> edgeMapList, int padding)
         {
             var firstEdgeMap = edgeMapList.First();
 
@@ -364,16 +411,21 @@ namespace ImageProcessing
                             int size = width * height;
                             for (int i = 0; i < size; i++)
                             {
-                                pAverage[i] += pFloat[i];
+                                int x = i / height;
+                                int y = i % height;
+                                if ((x < padding) || (x >= (width - padding)) || (y < padding) || (y >= (height - padding)))
+                                    pAverage[i] = 127.5f; // byte.MaxValue / 2.0f;
+                                else
+                                    pAverage[i] += pFloat[i];
                             }
                         }
                         edgeMapCount++;
                     }
                 }
             }
-            for (int y = 0; y < height; y++)
+            for (int y = padding; y < height - padding; y++)
             {
-                for (int x = 0; x < width; x++)
+                for (int x = padding; x < width - padding; x++)
                 {
                     averageArray[x, y] /= (float)edgeMapCount;
                 }
@@ -425,7 +477,7 @@ namespace ImageProcessing
             var height = firstEdgeMap.Height;
             var maximum = firstEdgeMap.MaximumValue;
 
-            var averageArray = GenerateEdgeDetectionAverage(edgeMapList).Data;
+            var averageArray = GenerateEdgeDetectionAverage(edgeMapList, 0).Data;
 
             // Now calculate Std Dev
             var stdDevArray = new float[width, height];
@@ -459,37 +511,123 @@ namespace ImageProcessing
             return new YDataFloat(stdDevArray, maximum);
         }
 
+        // -------------- Advance sliding window of averages --------------
+
+        public static void AdvanceEdgeDetectionAverage(ref YDataFloat edgeMapAverage, YDataFloat edgeDataNew, YDataFloat edgeDataOld, int edgeMapAverageCount)
+        {
+            var width = edgeMapAverage.Width;
+            var height = edgeMapAverage.Height;
+            float edgeMapAverageCountFloat = edgeMapAverageCount;
+
+            unsafe
+            {
+                fixed (float* pAverage = edgeMapAverage.Data, pNew = edgeDataNew.Data, pOld = edgeDataOld.Data)
+                {
+                    int size = width * height;
+                    for (int i = 0; i < size; i++)
+                    {
+                        pAverage[i] += (pNew[i] - pOld[i]) / edgeMapAverageCountFloat;
+                    }
+                }
+            }
+        }
+
+        public static void AdvanceEdgeDetectionAverageAccel(AcceleratorTarget acceleratorTarget, ref YDataFloat edgeMapAverage, YDataFloat edgeDataNew, YDataFloat edgeDataOld, int edgeMapAverageCount)
+        {
+            var target = GetAcceleratorTarget(acceleratorTarget);
+
+            var width = edgeMapAverage.Width;
+            var height = edgeMapAverage.Height;
+            float edgeMapAverageCountFloat = edgeMapAverageCount;
+
+            var fpAverage = new FloatParallelArray(edgeMapAverage.Data);
+            var fpNew = new FloatParallelArray(edgeDataNew.Data);
+            var fpOld = new FloatParallelArray(edgeDataOld.Data);
+
+            var fpAdjust = ParallelArrays.Subtract(fpNew, fpOld);
+            fpAdjust = ParallelArrays.Divide(fpAdjust, edgeMapAverageCountFloat);
+
+            var fpOutput = ParallelArrays.Subtract(fpAverage, fpAdjust);
+
+            var output = target.ToArray2D(fpOutput);
+
+            edgeMapAverage = new YDataFloat(output, edgeMapAverage.MaximumValue);
+        }
+
         // -------------- Frame difference, for logo detection --------------
 
-        public static void CalculateLogoDifference(YDataFloat edgeMapAvg, YDataFloat logoDetectionFrame, out float difference)
+        public static void CalculateLogoDifference(YDataFloat edgeMapAvg, YDataFloat logoDetectionFrame, float detectionFrameAverage, float detectionFrameMaximum, out float difference)
         {
             int width = edgeMapAvg.Width;
             int height = edgeMapAvg.Height;
 
-            // Calculate absolute difference between values
+            var detectionFrameMaximumOffset = (detectionFrameMaximum - detectionFrameAverage);
 
+            // Calculate absolute difference between values and apply power of important pixels from logoDetectionFrame
             var total = 0.0f;
-            Parallel.For(0, height - 1, (y) =>
+            unsafe
             {
-                unsafe
+                fixed (float* pEdgeMapAvg = edgeMapAvg.Data, pLogoDetectionFrame = logoDetectionFrame.Data)
                 {
-                    fixed (float* pEdgeMapAvg = edgeMapAvg.Data)
+                    int size = width * height;
+                    for (int i = 0; i < size; i++)
                     {
-                        fixed (float* pLogoDetectionFrame = logoDetectionFrame.Data)
+                        var detectionFrameOffset = Math.Abs(pLogoDetectionFrame[i] - detectionFrameAverage);
+                        var edgeMapOffset = Math.Abs(pEdgeMapAvg[i] - detectionFrameAverage);
+                        if (edgeMapOffset < detectionFrameOffset)
                         {
-                            int size = width * height;
-                            for (int i = 0; i < size; i++)
-                            {
-                                total += Math.Abs(pEdgeMapAvg[i] - pLogoDetectionFrame[i]);
-                            }
+                            var power = detectionFrameOffset / detectionFrameMaximumOffset;
+                            total += power * (detectionFrameOffset - edgeMapOffset) * 255.0f / detectionFrameMaximumOffset;
                         }
+
                     }
                 }
-            });
+            }
 
             total /= (float)(width * height);
             difference = total;
         }
-    
+
+        public static YDataFloat GenerateLogoDifferenceMap(YDataFloat edgeMapAvg, YDataFloat logoDetectionFrame, float detectionFrameAverage, float detectionFrameMaximum)
+        {
+            int width = edgeMapAvg.Width;
+            int height = edgeMapAvg.Height;
+            var maximum = edgeMapAvg.MaximumValue;
+
+            var detectionFrameMaximumOffset = (detectionFrameMaximum - detectionFrameAverage);
+
+            // Calculate absolute difference between values and apply power of important pixels from logoDetectionFrame
+            var outputArray = new float[width, height];
+            Array.Clear(outputArray, 0, outputArray.Length);
+
+            unsafe
+            {
+                fixed (float* pEdgeMapAvg = edgeMapAvg.Data,
+                              pLogoDetectionFrame = logoDetectionFrame.Data,
+                              pOutput = outputArray)
+                {
+                    int size = width * height;
+                    for (int i = 0; i < size; i++)
+                    {
+                        var detectionFrameOffset = Math.Abs(pLogoDetectionFrame[i] - detectionFrameAverage);
+                        var edgeMapOffset = Math.Abs(pEdgeMapAvg[i] - detectionFrameAverage);
+                        if (edgeMapOffset < detectionFrameOffset)
+                        {
+                            var power = detectionFrameOffset / detectionFrameMaximumOffset;
+                            pOutput[i] = power * (detectionFrameOffset - edgeMapOffset) * 255.0f / detectionFrameMaximumOffset;
+                        }
+                        else
+                        {
+                            pOutput[i] = 0.0f;
+                        }
+
+                        //pOutput[i] = byte.MaxValue * power;
+                    }
+                }
+            }
+
+            return new YDataFloat(outputArray, maximum);
+        }
+
     }
 }

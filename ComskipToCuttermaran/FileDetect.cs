@@ -13,6 +13,7 @@ namespace ComskipToCuttermaran
             public string csvFilename;
             public string videoFilename;
             public string audioFilename;
+            public string logoFilename;
         }
 
         private static void DetectFilename(string basePath, ref string filename, params string[] extensions)
@@ -40,6 +41,11 @@ namespace ComskipToCuttermaran
             DetectFilename(basePath, ref filename, ".mp2", ".ac3", ".mpg", ".ts");
         }
 
+        private static void DetectLogoFilename(string basePath, ref string filename)
+        {
+            filename = basePath + "-logo.png";
+        }
+
         public static Filenames FillFilenames(string filename, string videoFilename = null, string audioFilename = null)
         {
             Filenames result;
@@ -47,6 +53,7 @@ namespace ComskipToCuttermaran
             result.csvFilename = String.Empty;
             result.videoFilename = videoFilename;
             result.audioFilename = audioFilename;
+            result.logoFilename = String.Empty;
 
             if (!string.IsNullOrEmpty(filename) && System.IO.File.Exists(filename))
             {
@@ -61,6 +68,7 @@ namespace ComskipToCuttermaran
 
                     DetectVideoFilename(basePath, ref result.videoFilename);
                     DetectAudioFilename(basePath, ref result.audioFilename);
+                    DetectLogoFilename(basePath, ref result.logoFilename);
                 }
                 else if (ext.Equals(".m2v", StringComparison.CurrentCultureIgnoreCase))
                 {
@@ -68,6 +76,7 @@ namespace ComskipToCuttermaran
                         result.videoFilename = filename;
 
                     DetectAudioFilename(basePath, ref result.audioFilename);
+                    DetectLogoFilename(basePath, ref result.logoFilename);
                 }
                 else if (ext.Equals(".mp2", StringComparison.CurrentCultureIgnoreCase) ||
                          ext.Equals(".ac3", StringComparison.CurrentCultureIgnoreCase))
@@ -76,6 +85,8 @@ namespace ComskipToCuttermaran
 
                     if (string.IsNullOrEmpty(result.audioFilename))
                         result.audioFilename = filename;
+
+                    DetectLogoFilename(basePath, ref result.logoFilename);
                 }
                 else
                 {
@@ -88,12 +99,12 @@ namespace ComskipToCuttermaran
                                 result.videoFilename = filename;
                             if (string.IsNullOrEmpty(result.audioFilename))
                                 result.audioFilename = filename;
+                            DetectLogoFilename(basePath, ref result.logoFilename);
                             return result;
                         }
                     }
                     
                     result.inputFilename = String.Empty;
-                    result.csvFilename = String.Empty;
                     result.videoFilename = String.Empty;
                     result.audioFilename = String.Empty;
                 }
