@@ -70,7 +70,7 @@ namespace Utils
             else
             {
                 string path = System.Environment.GetEnvironmentVariable("TEMP");
-                path += @"\SqlUpdate\" + MakeValidFileName(tempFilename);
+                path += @"\Maranate\" + MakeValidFileName(tempFilename);
 
                 FileInfo fi = new FileInfo(path);
                 if (fi.Directory.Exists == false)

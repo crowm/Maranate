@@ -54,7 +54,7 @@ namespace Maranate
             get
             {
                 var path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                path += @"\SqlUpdate\settings.xml";
+                path += @"\Maranate\settings.xml";
                 return path;
             }
         }
